@@ -1,0 +1,220 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Market {
+  id        Int      @id @default(autoincrement())
+  code      String   @unique
+  name      String
+  region    String
+  address   String?
+  createdAt DateTime @default(now())
+
+  auctionPrices AuctionPrice[]
+
+  @@index([region])
+  @@map("markets")
+}
+
+model ProductCategory {
+  id        Int      @id @default(autoincrement())
+  code      String   @unique
+  name      String
+  createdAt DateTime @default(now())
+
+  products Product[]
+
+  @@map("product_categories")
+}
+
+model Product {
+  id         Int      @id @default(autoincrement())
+  code       String   @unique
+  name       String
+  unit       String
+  unitQty    Int      @default(1)  // representative lot size (e.g. 10 for 10kg/box)
+  categoryId Int
+  createdAt  DateTime @default(now())
+
+  category      ProductCategory @relation(fields: [categoryId], references: [id])
+  auctionPrices      AuctionPrice[]
+  dailyPrices        DailyPrice[]
+  varietyDailyPrices VarietyDailyPrice[]
+  gradeDailyPrices   GradeDailyPrice[]
+
+  @@index([name])
+  @@index([categoryId])
+  @@map("products")
+}
+
+model AuctionPrice {
+  id          Int      @id @default(autoincrement())
+  marketId    Int
+  productId   Int
+  auctionDate DateTime @db.Date
+  grade       String
+  avgPrice    Decimal  @db.Decimal(12, 2)
+  minPrice    Decimal  @db.Decimal(12, 2)
+  maxPrice    Decimal  @db.Decimal(12, 2)
+  volume        Decimal  @db.Decimal(12, 2)
+  unit          String
+  outlierCount  Int      @default(0)  // lots excluded by IQR filter
+  createdAt     DateTime @default(now())
+
+  market  Market  @relation(fields: [marketId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([marketId, productId, auctionDate, grade], name: "uq_auction_price")
+  @@index([auctionDate])
+  @@index([productId, auctionDate])
+  @@index([marketId, auctionDate])
+  @@map("auction_prices")
+}
+
+model DailyPrice {
+  id          Int      @id @default(autoincrement())
+  productId   Int
+  priceDate   DateTime @db.Date
+  avgPrice    Decimal  @db.Decimal(12, 2)
+  minPrice    Decimal  @db.Decimal(12, 2)
+  maxPrice    Decimal  @db.Decimal(12, 2)
+  totalVolume      Decimal  @db.Decimal(12, 2)
+  changeRate       Decimal? @db.Decimal(6, 2)
+  excludedMarkets  Int      @default(0)  // markets excluded by cross-market IQR
+  createdAt        DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([productId, priceDate], name: "uq_daily_price")
+  @@index([priceDate])
+  @@index([productId, priceDate])
+  @@index([changeRate(sort: Desc)])
+  @@map("daily_prices")
+}
+
+model GradeDailyPrice {
+  id          Int      @id @default(autoincrement())
+  productId   Int
+  priceDate   DateTime @db.Date
+  gradeCode   String
+  gradeName   String
+  avgPrice    Decimal  @db.Decimal(12, 2)
+  minPrice    Decimal  @db.Decimal(12, 2)
+  maxPrice    Decimal  @db.Decimal(12, 2)
+  totalVolume Decimal  @db.Decimal(12, 2)
+  createdAt   DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([productId, priceDate, gradeCode], name: "uq_grade_daily_price")
+  @@index([productId, priceDate])
+  @@map("grade_daily_prices")
+}
+
+model VarietyDailyPrice {
+  id          Int      @id @default(autoincrement())
+  productId   Int
+  priceDate   DateTime @db.Date
+  varietyCode String
+  varietyName String
+  avgPrice    Decimal  @db.Decimal(12, 2)
+  minPrice    Decimal  @db.Decimal(12, 2)
+  maxPrice    Decimal  @db.Decimal(12, 2)
+  totalVolume Decimal  @db.Decimal(12, 2)
+  createdAt   DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([productId, priceDate, varietyCode], name: "uq_variety_daily_price")
+  @@index([productId, priceDate])
+  @@map("variety_daily_prices")
+}
+
+// Auth.js v5 required models
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+
+  accounts  Account[]
+  sessions  Session[]
+  favorites Favorite[]
+
+  @@map("users")
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+  @@map("verification_tokens")
+}
+
+model Favorite {
+  id          Int      @id @default(autoincrement())
+  userId      String
+  productCode String
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productCode])
+  @@index([userId])
+  @@map("favorites")
+}
+
+model CollectionLog {
+  id          Int       @id @default(autoincrement())
+  collectedAt DateTime  @default(now())
+  status      String
+  source      String
+  recordCount Int       @default(0)
+  errorMsg    String?
+  durationMs  Int?
+
+  @@index([collectedAt])
+  @@map("collection_logs")
+}
