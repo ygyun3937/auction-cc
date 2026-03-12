@@ -7,8 +7,10 @@ interface Settings {
   lastNotifiedAt: string | null
 }
 
-function maskUrl(_url: string): string {
-  return 'https://discord.com/api/webhooks/****/****'
+function maskUrl(url: string): string {
+  const parts = url.split('/')
+  const id = parts[parts.length - 2] ?? '****'
+  return `https://discord.com/api/webhooks/${id}/****`
 }
 
 function formatKST(isoString: string): string {
@@ -33,6 +35,9 @@ export default function NotificationSettingsModal({ onClose }: { onClose: () => 
       .then((data: Settings) => {
         setSettings(data)
         if (data.webhookUrl) setInputUrl(data.webhookUrl)
+      })
+      .catch(() => {
+        setSettings({ webhookUrl: null, lastNotifiedAt: null })
       })
   }, [])
 
@@ -116,7 +121,7 @@ export default function NotificationSettingsModal({ onClose }: { onClose: () => 
                     {maskUrl(settings.webhookUrl!)}
                   </span>
                   <button
-                    onClick={() => setIsEditing(true)}
+                    onClick={() => { setIsEditing(true); setStatus('idle'); setMessage('') }}
                     className="text-xs text-blue-500 hover:underline shrink-0"
                   >
                     수정
@@ -166,7 +171,7 @@ export default function NotificationSettingsModal({ onClose }: { onClose: () => 
               )}
               <button
                 onClick={handleSave}
-                disabled={status === 'saving'}
+                disabled={status === 'saving' || (!inputUrl && !isConfigured)}
                 className="flex-1 bg-green-500 hover:bg-green-600 text-white rounded-lg py-2 text-sm font-semibold disabled:opacity-50"
               >
                 {status === 'saving' ? '저장 중...' : '저장'}
