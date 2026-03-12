@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db'
 import { redis } from '@/lib/redis'
 import { fetchAuctionData } from '@/lib/api-client'
 import type { KatRealTimeItem } from '@/lib/api-client'
+import { notifyFavoritesPrices } from '@/lib/discord'
 
 const COLLECTION_LOCK_KEY = 'lock:collection'
 const LOCK_TTL = 300 // 5 minutes
@@ -59,8 +60,14 @@ export async function collectAuctionData(targetDate?: string): Promise<{
     // Update variety daily aggregates
     await updateVarietyDailyPrices(allItems, saleDate)
 
+    // Update origin daily aggregates
+    await updateOriginDailyPrices(allItems, saleDate)
+
     // Invalidate caches
     await invalidateCaches()
+
+    // Send Discord notifications for favorited products
+    await notifyFavoritesIfConfigured(saleDate)
 
     const durationMs = Date.now() - startTime
     await logCollection({ status: 'success', recordCount, source: 'public-data', durationMs })
@@ -297,6 +304,51 @@ async function updateVarietyDailyPrices(items: KatRealTimeItem[], saleDate: stri
   }
 }
 
+async function updateOriginDailyPrices(items: KatRealTimeItem[], saleDate: string) {
+  type Agg = { prices: number[]; totalQty: number }
+  const map = new Map<string, Agg>()
+
+  for (const item of items) {
+    const rawPrice = parseFloat(item.scsbd_prc)
+    const unitQty = parseFloat(item.unit_qty) || 1
+    const qty = parseFloat(item.qty) || 1
+    if (isNaN(rawPrice) || rawPrice <= 0) continue
+    if (!item.plor_nm || item.plor_nm === '-' || item.plor_nm === '') continue
+    if (!item.gds_mclsf_cd || !item.gds_mclsf_nm || item.gds_mclsf_nm === '-') continue
+
+    const price = rawPrice / unitQty
+    const catCode = item.gds_lclsf_cd || '00'
+    const productCode = `${catCode}-${item.gds_mclsf_cd}`
+    const key = `${productCode}::${item.plor_nm}`
+    const existing = map.get(key)
+    if (existing) {
+      existing.prices.push(price)
+      existing.totalQty += qty
+    } else {
+      map.set(key, { prices: [price], totalQty: qty })
+    }
+  }
+
+  const priceDate = new Date(saleDate)
+  for (const [key, agg] of map.entries()) {
+    if (agg.totalQty < MIN_VOLUME) continue
+    const [productCode, originName] = key.split('::')
+    const product = await prisma.product.findUnique({ where: { code: productCode } })
+    if (!product) continue
+
+    const filtered = removeOutliers(agg.prices)
+    const avgPrice = filtered.reduce((s, p) => s + p, 0) / filtered.length
+    const minPrice = Math.min(...filtered)
+    const maxPrice = Math.max(...filtered)
+
+    await prisma.originDailyPrice.upsert({
+      where: { uq_origin_daily_price: { productId: product.id, priceDate, originName } },
+      update: { avgPrice, minPrice, maxPrice, totalVolume: agg.totalQty },
+      create: { productId: product.id, priceDate, originName, avgPrice, minPrice, maxPrice, totalVolume: agg.totalQty },
+    })
+  }
+}
+
 async function invalidateCaches() {
   const { deleteCache } = await import('@/lib/redis')
   await Promise.all([
@@ -352,4 +404,74 @@ function getRegionFromMarketCode(code: string): string {
     '35': '전북', '36': '전남', '37': '경북', '38': '경남', '39': '제주',
   }
   return regionMap[prefix] ?? '기타'
+}
+
+export async function notifyFavoritesIfConfigured(saleDate?: string) {
+  // Find the target date: use provided saleDate or fall back to latest dailyPrice date
+  let targetDate: string
+  if (saleDate) {
+    targetDate = saleDate
+  } else {
+    const latest = await prisma.dailyPrice.findFirst({
+      orderBy: { priceDate: 'desc' },
+      select: { priceDate: true },
+    })
+    if (!latest) return
+    targetDate = latest.priceDate.toISOString().split('T')[0]
+  }
+
+  const priceDate = new Date(targetDate)
+
+  // Find all users with a configured discord webhook
+  const users = await prisma.user.findMany({
+    where: { discordWebhookUrl: { not: null } },
+    select: { id: true, discordWebhookUrl: true },
+  })
+  if (users.length === 0) return
+
+  console.log(`[collector] Sending Discord notifications to ${users.length} users for ${targetDate}`)
+
+  for (const user of users) {
+    try {
+      const favorites = await prisma.favorite.findMany({
+        where: { userId: user.id },
+        select: { productCode: true },
+      })
+      if (favorites.length === 0) continue
+
+      const productCodes = favorites.map(f => f.productCode)
+
+      const dailyPrices = await prisma.dailyPrice.findMany({
+        where: {
+          priceDate,
+          product: { code: { in: productCodes } },
+        },
+        include: { product: true },
+        orderBy: { product: { name: 'asc' } },
+      })
+      if (dailyPrices.length === 0) continue
+
+      const payload = dailyPrices.map(d => ({
+        productCode: d.product.code,
+        productName: d.product.name,
+        unit: d.product.unit,
+        unitQty: d.product.unitQty,
+        avgPrice: Number(d.avgPrice),
+        minPrice: Number(d.minPrice),
+        maxPrice: Number(d.maxPrice),
+        totalVolume: Number(d.totalVolume),
+        changeRate: d.changeRate ? Number(d.changeRate) : null,
+        priceDate: targetDate,
+      }))
+
+      await notifyFavoritesPrices(payload, user.discordWebhookUrl!)
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { discordLastNotifiedAt: new Date() },
+      })
+      console.log(`[collector] Notified user ${user.id} (${payload.length} products)`)
+    } catch (error) {
+      console.error(`[collector] Failed to notify user ${user.id}:`, error)
+    }
+  }
 }
