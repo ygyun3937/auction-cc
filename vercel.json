@@ -1,12 +1,7 @@
 {
   "crons": [
-    {
-      "path": "/api/cron/collect",
-      "schedule": "0 1 * * *"
-    },
-    {
-      "path": "/api/cron/collect-grades",
-      "schedule": "0 18,19,20,21,22,23 * * 1-6"
-    }
+    { "path": "/api/cron/collect", "schedule": "0 1 * * *" },
+    { "path": "/api/cron/collect-grades", "schedule": "0 18,19,20,21,22,23 * * 1-6" },
+    { "path": "/api/cron/notify", "schedule": "*/30 * * * *" }
   ]
 }
