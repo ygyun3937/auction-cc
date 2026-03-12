@@ -5,6 +5,9 @@ import { useState, useEffect } from 'react'
 interface Settings {
   webhookUrl: string | null
   lastNotifiedAt: string | null
+  notifyHour: number | null
+  notifyMinute: number | null
+  notifyDays: string | null
 }
 
 function maskUrl(url: string): string {
@@ -28,6 +31,9 @@ export default function NotificationSettingsModal({ onClose }: { onClose: () => 
   const [inputUrl, setInputUrl] = useState('')
   const [status, setStatus] = useState<'idle' | 'saving' | 'testing' | 'success' | 'error'>('idle')
   const [message, setMessage] = useState('')
+  const [notifyHour, setNotifyHour] = useState<number | null>(null)
+  const [notifyMinute, setNotifyMinute] = useState<number | null>(null)
+  const [notifyDaysArr, setNotifyDaysArr] = useState<number[]>([])
 
   useEffect(() => {
     fetch('/api/user/notification-settings')
@@ -35,23 +41,42 @@ export default function NotificationSettingsModal({ onClose }: { onClose: () => 
       .then((data: Settings) => {
         setSettings(data)
         if (data.webhookUrl) setInputUrl(data.webhookUrl)
+        setNotifyHour(data.notifyHour)
+        setNotifyMinute(data.notifyMinute)
+        setNotifyDaysArr(
+          data.notifyDays ? data.notifyDays.split(',').map(Number) : []
+        )
       })
       .catch(() => {
-        setSettings({ webhookUrl: null, lastNotifiedAt: null })
+        setSettings({ webhookUrl: null, lastNotifiedAt: null, notifyHour: null, notifyMinute: null, notifyDays: null })
       })
   }, [])
 
   async function handleSave() {
     setStatus('saving')
     setMessage('')
+    const daysValue = notifyDaysArr.length > 0
+      ? [...notifyDaysArr].sort((a, b) => a - b).join(',')
+      : null
     const res = await fetch('/api/user/notification-settings', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ webhookUrl: inputUrl || null }),
+      body: JSON.stringify({
+        webhookUrl: inputUrl || null,
+        notifyHour,
+        notifyMinute,
+        notifyDays: daysValue,
+      }),
     })
     const data = await res.json()
     if (res.ok) {
-      setSettings(prev => ({ ...prev!, webhookUrl: inputUrl || null }))
+      setSettings(prev => ({
+        ...prev!,
+        webhookUrl: inputUrl || null,
+        notifyHour,
+        notifyMinute,
+        notifyDays: daysValue,
+      }))
       setIsEditing(false)
       setStatus('success')
       setMessage('저장됐습니다.')
@@ -83,8 +108,11 @@ export default function NotificationSettingsModal({ onClose }: { onClose: () => 
       body: JSON.stringify({ webhookUrl: null }),
     })
     if (res.ok) {
-      setSettings({ webhookUrl: null, lastNotifiedAt: null })
+      setSettings({ webhookUrl: null, lastNotifiedAt: null, notifyHour: null, notifyMinute: null, notifyDays: null })
       setInputUrl('')
+      setNotifyHour(null)
+      setNotifyMinute(null)
+      setNotifyDaysArr([])
       setIsEditing(false)
       setStatus('idle')
       setMessage('')
@@ -133,7 +161,7 @@ export default function NotificationSettingsModal({ onClose }: { onClose: () => 
                   value={inputUrl}
                   onChange={e => setInputUrl(e.target.value)}
                   placeholder="https://discord.com/api/webhooks/..."
-                  className="w-full text-xs font-mono border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-green-400"
+                  className="w-full text-xs font-mono border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-400"
                 />
               )}
               <p className="text-xs text-gray-400 mt-1">
@@ -156,6 +184,74 @@ export default function NotificationSettingsModal({ onClose }: { onClose: () => 
               <p className={`text-xs mb-3 ${status === 'error' ? 'text-red-500' : 'text-green-600'}`}>
                 {message}
               </p>
+            )}
+
+            {/* Schedule */}
+            {(isConfigured || inputUrl) && (
+              <div className="mb-4 space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">알림 시간</label>
+                  <div className="flex gap-2">
+                    <select
+                      value={notifyHour ?? ''}
+                      onChange={e => {
+                        const val = e.target.value
+                        if (val === '') {
+                          setNotifyHour(null)
+                          setNotifyMinute(null)
+                        } else {
+                          setNotifyHour(Number(val))
+                          if (notifyMinute === null) setNotifyMinute(0)
+                        }
+                      }}
+                      className="flex-1 text-sm border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-400"
+                    >
+                      <option value="">없음</option>
+                      {Array.from({ length: 24 }, (_, i) => (
+                        <option key={i} value={i}>{String(i).padStart(2, '0')}시</option>
+                      ))}
+                    </select>
+                    <select
+                      value={notifyMinute ?? ''}
+                      disabled={notifyHour === null}
+                      onChange={e => setNotifyMinute(Number(e.target.value))}
+                      className="w-24 text-sm border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-400 disabled:opacity-40"
+                    >
+                      <option value={0}>00분</option>
+                      <option value={30}>30분</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">
+                    알림 요일
+                    <span className="ml-1.5 font-normal normal-case text-gray-400">
+                      {notifyDaysArr.length === 0 ? '(매일)' : ''}
+                    </span>
+                  </label>
+                  <div className="flex gap-1">
+                    {['일', '월', '화', '수', '목', '금', '토'].map((label, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          setNotifyDaysArr(prev =>
+                            prev.includes(idx) ? prev.filter(d => d !== idx) : [...prev, idx]
+                          )
+                        }}
+                        className={`flex-1 text-xs py-1 rounded-md border transition-colors ${
+                          notifyDaysArr.includes(idx)
+                            ? 'bg-green-500 text-white border-green-500'
+                            : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-green-400'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             )}
 
             {/* Buttons */}
