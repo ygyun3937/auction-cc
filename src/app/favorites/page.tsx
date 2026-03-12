@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db'
 import { getNationwidePrices } from '@/services/price.service'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import FavoritesHeader from './FavoritesHeader'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,9 +23,7 @@ export default async function FavoritesPage() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">
-        ★ 즐겨찾기
-      </h1>
+      <FavoritesHeader />
 
       {productCodes.length === 0 ? (
         <div className="text-center py-20 text-gray-500">
