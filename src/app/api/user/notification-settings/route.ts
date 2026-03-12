@@ -94,6 +94,9 @@ export async function PUT(req: Request) {
     normalizedDays = nums.sort((a, b) => a - b).join(',')
   }
 
+  // If no time is configured, days are meaningless — clear them too
+  if (!hourSet) normalizedDays = null
+
   await prisma.user.update({
     where: { id: session.user.id },
     data: {

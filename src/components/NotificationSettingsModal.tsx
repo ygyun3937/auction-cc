@@ -116,6 +116,9 @@ export default function NotificationSettingsModal({ onClose }: { onClose: () => 
       setIsEditing(false)
       setStatus('idle')
       setMessage('')
+    } else {
+      setStatus('error')
+      setMessage('해제 실패')
     }
   }
 
