@@ -406,8 +406,13 @@ function getRegionFromMarketCode(code: string): string {
   return regionMap[prefix] ?? '기타'
 }
 
-export async function notifyFavoritesIfConfigured(saleDate?: string) {
-  // Find the target date: use provided saleDate or fall back to latest dailyPrice date
+export async function notifyFavoritesForUser(userId: string, saleDate?: string): Promise<void> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { discordWebhookUrl: true },
+  })
+  if (!user?.discordWebhookUrl) return
+
   let targetDate: string
   if (saleDate) {
     targetDate = saleDate
@@ -422,10 +427,70 @@ export async function notifyFavoritesIfConfigured(saleDate?: string) {
 
   const priceDate = new Date(targetDate)
 
-  // Find all users with a configured discord webhook
+  const favorites = await prisma.favorite.findMany({
+    where: { userId },
+    select: { productCode: true },
+  })
+  if (favorites.length === 0) return
+
+  const productCodes = favorites.map(f => f.productCode)
+
+  const dailyPrices = await prisma.dailyPrice.findMany({
+    where: {
+      priceDate,
+      product: { code: { in: productCodes } },
+    },
+    include: { product: true },
+    orderBy: { product: { name: 'asc' } },
+  })
+  if (dailyPrices.length === 0) return
+
+  const payload = dailyPrices.map(d => ({
+    productCode: d.product.code,
+    productName: d.product.name,
+    unit: d.product.unit,
+    unitQty: d.product.unitQty,
+    avgPrice: Number(d.avgPrice),
+    minPrice: Number(d.minPrice),
+    maxPrice: Number(d.maxPrice),
+    totalVolume: Number(d.totalVolume),
+    changeRate: d.changeRate ? Number(d.changeRate) : null,
+    priceDate: targetDate,
+  }))
+
+  await notifyFavoritesPrices(payload, user.discordWebhookUrl)
+
+  try {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { discordLastNotifiedAt: new Date() },
+    })
+  } catch (err) {
+    console.error(`[collector] Failed to update discordLastNotifiedAt for user ${userId}:`, err)
+  }
+}
+
+export async function notifyFavoritesIfConfigured(saleDate?: string) {
+  // Find the target date: use provided saleDate or fall back to latest dailyPrice date
+  let targetDate: string
+  if (saleDate) {
+    targetDate = saleDate
+  } else {
+    const latest = await prisma.dailyPrice.findFirst({
+      orderBy: { priceDate: 'desc' },
+      select: { priceDate: true },
+    })
+    if (!latest) return
+    targetDate = latest.priceDate.toISOString().split('T')[0]
+  }
+
+  // Only notify users WITHOUT a schedule (schedule users are handled by /api/cron/notify)
   const users = await prisma.user.findMany({
-    where: { discordWebhookUrl: { not: null } },
-    select: { id: true, discordWebhookUrl: true },
+    where: {
+      discordWebhookUrl: { not: null },
+      discordNotifyHour: null,
+    },
+    select: { id: true },
   })
   if (users.length === 0) return
 
@@ -433,43 +498,8 @@ export async function notifyFavoritesIfConfigured(saleDate?: string) {
 
   for (const user of users) {
     try {
-      const favorites = await prisma.favorite.findMany({
-        where: { userId: user.id },
-        select: { productCode: true },
-      })
-      if (favorites.length === 0) continue
-
-      const productCodes = favorites.map(f => f.productCode)
-
-      const dailyPrices = await prisma.dailyPrice.findMany({
-        where: {
-          priceDate,
-          product: { code: { in: productCodes } },
-        },
-        include: { product: true },
-        orderBy: { product: { name: 'asc' } },
-      })
-      if (dailyPrices.length === 0) continue
-
-      const payload = dailyPrices.map(d => ({
-        productCode: d.product.code,
-        productName: d.product.name,
-        unit: d.product.unit,
-        unitQty: d.product.unitQty,
-        avgPrice: Number(d.avgPrice),
-        minPrice: Number(d.minPrice),
-        maxPrice: Number(d.maxPrice),
-        totalVolume: Number(d.totalVolume),
-        changeRate: d.changeRate ? Number(d.changeRate) : null,
-        priceDate: targetDate,
-      }))
-
-      await notifyFavoritesPrices(payload, user.discordWebhookUrl!)
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { discordLastNotifiedAt: new Date() },
-      })
-      console.log(`[collector] Notified user ${user.id} (${payload.length} products)`)
+      await notifyFavoritesForUser(user.id, targetDate)
+      console.log(`[collector] Notified user ${user.id}`)
     } catch (error) {
       console.error(`[collector] Failed to notify user ${user.id}:`, error)
     }
