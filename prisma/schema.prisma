@@ -46,6 +46,7 @@ model Product {
   dailyPrices        DailyPrice[]
   varietyDailyPrices VarietyDailyPrice[]
   gradeDailyPrices   GradeDailyPrice[]
+  originDailyPrices  OriginDailyPrice[]
 
   @@index([name])
   @@index([categoryId])
@@ -135,6 +136,24 @@ model VarietyDailyPrice {
   @@map("variety_daily_prices")
 }
 
+model OriginDailyPrice {
+  id          Int      @id @default(autoincrement())
+  productId   Int
+  priceDate   DateTime @db.Date
+  originName  String
+  avgPrice    Decimal  @db.Decimal(12, 2)
+  minPrice    Decimal  @db.Decimal(12, 2)
+  maxPrice    Decimal  @db.Decimal(12, 2)
+  totalVolume Decimal  @db.Decimal(12, 2)
+  createdAt   DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([productId, priceDate, originName], name: "uq_origin_daily_price")
+  @@index([productId, priceDate])
+  @@map("origin_daily_prices")
+}
+
 // Auth.js v5 required models
 model User {
   id            String    @id @default(cuid())
@@ -143,6 +162,9 @@ model User {
   emailVerified DateTime?
   image         String?
   createdAt     DateTime  @default(now())
+
+  discordWebhookUrl     String?
+  discordLastNotifiedAt DateTime?
 
   accounts  Account[]
   sessions  Session[]
