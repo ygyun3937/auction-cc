@@ -4,6 +4,7 @@ import './globals.css'
 import { Providers } from '@/components/providers'
 import { Header } from '@/components/layout/header'
 import { Footer } from '@/components/layout/footer'
+import PushNotificationManager from '@/components/PushNotificationManager'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -18,6 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ko" suppressHydrationWarning>
       <body className={inter.className}>
         <Providers>
+          <PushNotificationManager />
           <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
             <Header />
             <main className="flex-1 container mx-auto px-4 py-6 max-w-7xl">
