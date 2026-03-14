@@ -168,6 +168,8 @@ model User {
   discordNotifyHour     Int?
   discordNotifyMinute   Int?
   discordNotifyDays     String?
+  discordUserId         String?   @unique
+  discordUsername       String?
 
   accounts          Account[]
   sessions          Session[]
