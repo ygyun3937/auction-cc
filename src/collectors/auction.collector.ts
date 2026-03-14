@@ -3,6 +3,7 @@ import { redis } from '@/lib/redis'
 import { fetchAuctionData } from '@/lib/api-client'
 import type { KatRealTimeItem } from '@/lib/api-client'
 import { notifyFavoritesPrices } from '@/lib/discord'
+import { sendPushNotification } from '@/lib/webpush'
 
 const COLLECTION_LOCK_KEY = 'lock:collection'
 const LOCK_TTL = 300 // 5 minutes
@@ -407,12 +408,19 @@ function getRegionFromMarketCode(code: string): string {
 }
 
 export async function notifyFavoritesForUser(userId: string, saleDate?: string): Promise<void> {
+  // 1. 사용자 조회 (Discord webhook + push subscriptions 함께)
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { discordWebhookUrl: true },
+    select: {
+      discordWebhookUrl: true,
+      pushSubscriptions: { select: { endpoint: true, p256dh: true, auth: true } },
+    },
   })
-  if (!user?.discordWebhookUrl) return
 
+  // 2. 알림 채널 없으면 noop
+  if (!user?.discordWebhookUrl && (!user?.pushSubscriptions || user.pushSubscriptions.length === 0)) return
+
+  // 3. 날짜 결정
   let targetDate: string
   if (saleDate) {
     targetDate = saleDate
@@ -427,6 +435,7 @@ export async function notifyFavoritesForUser(userId: string, saleDate?: string):
 
   const priceDate = new Date(targetDate)
 
+  // 4. 즐겨찾기 + dailyPrices 조회
   const favorites = await prisma.favorite.findMany({
     where: { userId },
     select: { productCode: true },
@@ -458,15 +467,61 @@ export async function notifyFavoritesForUser(userId: string, saleDate?: string):
     priceDate: targetDate,
   }))
 
-  await notifyFavoritesPrices(payload, user.discordWebhookUrl)
+  // 5. 성공 추적
+  let discordSuccess = false
+  let pushSuccess = false
 
-  try {
-    await prisma.user.update({
-      where: { id: userId },
-      data: { discordLastNotifiedAt: new Date() },
-    })
-  } catch (err) {
-    console.error(`[collector] Failed to update discordLastNotifiedAt for user ${userId}:`, err)
+  // 6. Discord 발송 (webhook 있는 경우만)
+  if (user.discordWebhookUrl) {
+    try {
+      await notifyFavoritesPrices(payload, user.discordWebhookUrl)
+      discordSuccess = true
+    } catch (err) {
+      console.error(`[collector] Discord notification failed for user ${userId}:`, err)
+    }
+  }
+
+  // 7. Web Push 발송 (구독 있는 경우)
+  if (user.pushSubscriptions && user.pushSubscriptions.length > 0) {
+    // Web Push 메시지 body 생성
+    const first = payload[0]
+    const priceStr = Math.round(first.avgPrice).toLocaleString('ko-KR')
+    const pushBody = payload.length === 1
+      ? `${first.productName} ${priceStr}원`
+      : `${first.productName} ${priceStr}원 외 ${payload.length - 1}개 품목`
+
+    const pushPayload = { title: '즐겨찾기 가격 알림', body: pushBody }
+
+    for (const sub of user.pushSubscriptions) {
+      try {
+        await sendPushNotification(sub, pushPayload)
+        pushSuccess = true
+      } catch (err: unknown) {
+        const statusCode = (err as { statusCode?: number }).statusCode
+        if (statusCode === 410 || statusCode === 404) {
+          // 만료된 구독 — DB에서 삭제
+          try {
+            await prisma.pushSubscription.delete({ where: { endpoint: sub.endpoint } })
+          } catch (deleteErr) {
+            console.error(`[collector] Failed to delete expired push subscription for user ${userId}:`, deleteErr)
+          }
+        } else {
+          console.error(`[collector] Web Push failed for user ${userId} endpoint ${sub.endpoint}:`, err)
+        }
+      }
+    }
+  }
+
+  // 8. 하나라도 성공한 경우 discordLastNotifiedAt 업데이트
+  if (discordSuccess || pushSuccess) {
+    try {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { discordLastNotifiedAt: new Date() },
+      })
+    } catch (err) {
+      console.error(`[collector] Failed to update discordLastNotifiedAt for user ${userId}:`, err)
+    }
   }
 }
 
@@ -487,8 +542,11 @@ export async function notifyFavoritesIfConfigured(saleDate?: string) {
   // Only notify users WITHOUT a schedule (schedule users are handled by /api/cron/notify)
   const users = await prisma.user.findMany({
     where: {
-      discordWebhookUrl: { not: null },
       discordNotifyHour: null,
+      OR: [
+        { discordWebhookUrl: { not: null } },
+        { pushSubscriptions: { some: {} } },
+      ],
     },
     select: { id: true },
   })
