@@ -23,9 +23,12 @@ export async function POST(req: NextRequest) {
   // Find all users with webhook + schedule configured
   const users = await prisma.user.findMany({
     where: {
-      discordWebhookUrl: { not: null },
       discordNotifyHour: { not: null },
       discordNotifyMinute: { not: null },
+      OR: [
+        { discordWebhookUrl: { not: null } },
+        { pushSubscriptions: { some: {} } },
+      ],
     },
     select: {
       id: true,
