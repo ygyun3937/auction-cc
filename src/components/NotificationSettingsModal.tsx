@@ -173,7 +173,11 @@ export default function NotificationSettingsModal({ onClose }: { onClose: () => 
     }
 
     try {
-      const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
+      const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+      if (!vapidKey) {
+        setPushMessage('Push 설정 오류: VAPID 공개키가 구성되지 않았습니다')
+        return
+      }
       const sub = await swRegistration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(vapidKey),
@@ -208,7 +212,6 @@ export default function NotificationSettingsModal({ onClose }: { onClose: () => 
     try {
       const sub = await swRegistration.pushManager.getSubscription()
       if (sub) {
-        await sub.unsubscribe()
         const delRes = await fetch('/api/user/push-subscription', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
@@ -217,6 +220,7 @@ export default function NotificationSettingsModal({ onClose }: { onClose: () => 
         if (!delRes.ok) {
           throw new Error(`Server rejected unsubscribe: ${delRes.status}`)
         }
+        await sub.unsubscribe()
         setServerEndpoints(prev => prev.filter(e => e !== sub.endpoint))
       }
       setIsSubscribed(false)

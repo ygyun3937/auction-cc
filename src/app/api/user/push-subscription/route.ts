@@ -34,6 +34,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid subscription' }, { status: 400 })
   }
 
+  // Validate endpoint is a valid HTTPS URL
+  try {
+    const url = new URL(endpoint)
+    if (url.protocol !== 'https:') {
+      return NextResponse.json({ error: 'Invalid subscription' }, { status: 400 })
+    }
+  } catch {
+    return NextResponse.json({ error: 'Invalid subscription' }, { status: 400 })
+  }
+
   // Check if endpoint already belongs to a different user
   const existing = await prisma.pushSubscription.findUnique({
     where: { endpoint },
