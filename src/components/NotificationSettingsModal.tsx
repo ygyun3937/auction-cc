@@ -34,6 +34,11 @@ export default function NotificationSettingsModal({ onClose }: { onClose: () => 
   const [notifyHour, setNotifyHour] = useState<number | null>(null)
   const [notifyMinute, setNotifyMinute] = useState<number | null>(null)
   const [notifyDaysArr, setNotifyDaysArr] = useState<number[]>([])
+  const [isSubscribed, setIsSubscribed] = useState(false)
+  const [serverEndpoints, setServerEndpoints] = useState<string[]>([])
+  const [swRegistration, setSwRegistration] = useState<ServiceWorkerRegistration | null>(null)
+  const [pushSupported, setPushSupported] = useState(false)
+  const [pushMessage, setPushMessage] = useState('')
 
   useEffect(() => {
     fetch('/api/user/notification-settings')
@@ -50,6 +55,34 @@ export default function NotificationSettingsModal({ onClose }: { onClose: () => 
       .catch(() => {
         setSettings({ webhookUrl: null, lastNotifiedAt: null, notifyHour: null, notifyMinute: null, notifyDays: null })
       })
+
+    // Web Push 초기 로딩
+    if (typeof Notification === 'undefined' || !('serviceWorker' in navigator)) return
+    setPushSupported(true)
+
+    async function loadPushState() {
+      try {
+        const [serverRes, registration] = await Promise.all([
+          fetch('/api/user/push-subscription').then(r => r.json()),
+          navigator.serviceWorker.getRegistration('/sw.js'),
+        ])
+        const endpoints: string[] = serverRes.endpoints ?? []
+        setServerEndpoints(endpoints)
+
+        if (!registration) {
+          setSwRegistration(null)
+          setIsSubscribed(false)
+          return
+        }
+        setSwRegistration(registration)
+
+        const sub = await registration.pushManager.getSubscription()
+        setIsSubscribed(sub ? endpoints.includes(sub.endpoint) : false)
+      } catch {
+        setIsSubscribed(false)
+      }
+    }
+    loadPushState()
   }, [])
 
   async function handleSave() {
@@ -122,6 +155,77 @@ export default function NotificationSettingsModal({ onClose }: { onClose: () => 
     }
   }
 
+  function urlBase64ToUint8Array(base64String: string) {
+    const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+    const rawData = atob(base64)
+    return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)))
+  }
+
+  async function handlePushSubscribe() {
+    setPushMessage('')
+    if (!swRegistration) return
+
+    const permission = await Notification.requestPermission()
+    if (permission !== 'granted') {
+      setPushMessage('브라우저 설정에서 알림을 허용해주세요')
+      return
+    }
+
+    try {
+      const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
+      const sub = await swRegistration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidKey),
+      })
+
+      const subJson = sub.toJSON()
+      const res = await fetch('/api/user/push-subscription', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          endpoint: subJson.endpoint,
+          keys: { p256dh: subJson.keys?.p256dh, auth: subJson.keys?.auth },
+        }),
+      })
+
+      if (!res.ok) {
+        throw new Error(`Server rejected subscription: ${res.status}`)
+      }
+
+      setIsSubscribed(true)
+      setServerEndpoints(prev => [...prev, sub.endpoint])
+    } catch (err) {
+      console.error('[push] Subscribe failed:', err)
+      setPushMessage('구독 중 오류가 발생했습니다')
+    }
+  }
+
+  async function handlePushUnsubscribe() {
+    setPushMessage('')
+    if (!swRegistration) return
+
+    try {
+      const sub = await swRegistration.pushManager.getSubscription()
+      if (sub) {
+        await sub.unsubscribe()
+        const delRes = await fetch('/api/user/push-subscription', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ endpoint: sub.endpoint }),
+        })
+        if (!delRes.ok) {
+          throw new Error(`Server rejected unsubscribe: ${delRes.status}`)
+        }
+        setServerEndpoints(prev => prev.filter(e => e !== sub.endpoint))
+      }
+      setIsSubscribed(false)
+    } catch (err) {
+      console.error('[push] Unsubscribe failed:', err)
+      setPushMessage('구독 해제 중 오류가 발생했습니다')
+    }
+  }
+
   const isConfigured = !!settings?.webhookUrl
 
   return (
@@ -143,6 +247,35 @@ export default function NotificationSettingsModal({ onClose }: { onClose: () => 
           <p className="text-sm text-gray-400 text-center py-4">불러오는 중...</p>
         ) : (
           <>
+            {/* Web Push 알림 섹션 */}
+            {pushSupported && (
+              <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                <label className="block text-xs font-semibold text-gray-500 uppercase mb-2">브라우저 알림 (Web Push)</label>
+                {isSubscribed ? (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-green-700 dark:text-green-400">
+                      이 기기에서 구독 중 ({serverEndpoints.length}개 기기)
+                    </span>
+                    <button
+                      onClick={handlePushUnsubscribe}
+                      className="text-xs text-red-400 hover:text-red-600"
+                    >
+                      구독 해제
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handlePushSubscribe}
+                    className="w-full bg-blue-500 hover:bg-blue-600 text-white rounded-lg py-2 text-sm font-semibold"
+                  >
+                    이 기기에서 알림 받기
+                  </button>
+                )}
+                {pushMessage && (
+                  <p className="text-xs text-red-500 mt-1">{pushMessage}</p>
+                )}
+              </div>
+            )}
             {/* URL input / display */}
             <div className="mb-4">
               <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Webhook URL</label>
