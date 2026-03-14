@@ -126,7 +126,10 @@ export default function NotificationSettingsModal({ onClose }: { onClose: () => 
     const data = await res.json()
     if (res.ok) {
       setStatus('success')
-      setMessage('Discord에 테스트 메시지를 전송했습니다!')
+      const parts = []
+      if (data.discord) parts.push('Discord')
+      if (data.push) parts.push('브라우저 알림')
+      setMessage(`${parts.join(', ')}으로 테스트 메시지를 전송했습니다!`)
     } else {
       setStatus('error')
       setMessage(data.error ?? '전송 실패')
@@ -396,7 +399,7 @@ export default function NotificationSettingsModal({ onClose }: { onClose: () => 
 
             {/* Buttons */}
             <div className="flex gap-2">
-              {isConfigured && !isEditing && (
+              {(isConfigured || isSubscribed) && !isEditing && (
                 <button
                   onClick={handleTest}
                   disabled={status === 'testing'}
