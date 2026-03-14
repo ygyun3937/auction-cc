@@ -169,9 +169,10 @@ model User {
   discordNotifyMinute   Int?
   discordNotifyDays     String?
 
-  accounts  Account[]
-  sessions  Session[]
-  favorites Favorite[]
+  accounts          Account[]
+  sessions          Session[]
+  favorites         Favorite[]
+  pushSubscriptions PushSubscription[]
 
   @@map("users")
 }
@@ -229,6 +230,21 @@ model Favorite {
   @@unique([userId, productCode])
   @@index([userId])
   @@map("favorites")
+}
+
+model PushSubscription {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  endpoint  String   @unique  // 브라우저/기기별 고유 push URL
+  p256dh    String            // 암호화 공개키
+  auth      String            // 인증 시크릿
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_subscriptions")
 }
 
 model CollectionLog {
