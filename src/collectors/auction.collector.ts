@@ -2,7 +2,7 @@ import { prisma } from '@/lib/db'
 import { redis } from '@/lib/redis'
 import { fetchAuctionData } from '@/lib/api-client'
 import type { KatRealTimeItem } from '@/lib/api-client'
-import { notifyFavoritesPrices } from '@/lib/discord'
+import { notifyFavoritesPrices, sendDMToUser } from '@/lib/discord'
 import { sendPushNotification } from '@/lib/webpush'
 
 const COLLECTION_LOCK_KEY = 'lock:collection'
@@ -413,12 +413,13 @@ export async function notifyFavoritesForUser(userId: string, saleDate?: string):
     where: { id: userId },
     select: {
       discordWebhookUrl: true,
+      discordUserId: true,
       pushSubscriptions: { select: { endpoint: true, p256dh: true, auth: true } },
     },
   })
 
   // 2. 알림 채널 없으면 noop
-  if (!user?.discordWebhookUrl && (!user?.pushSubscriptions || user.pushSubscriptions.length === 0)) return
+  if (!user?.discordUserId && !user?.discordWebhookUrl && (!user?.pushSubscriptions || user.pushSubscriptions.length === 0)) return
 
   // 3. 날짜 결정
   let targetDate: string
@@ -471,13 +472,28 @@ export async function notifyFavoritesForUser(userId: string, saleDate?: string):
   let discordSuccess = false
   let pushSuccess = false
 
-  // 6. Discord 발송 (webhook 있는 경우만)
-  if (user.discordWebhookUrl) {
+  // 6. Discord 발송 (DM 우선, webhook 폴백)
+  if (user.discordUserId) {
+    try {
+      await sendDMToUser(user.discordUserId, payload)
+      discordSuccess = true
+    } catch (err) {
+      console.error(`[collector] Discord DM failed for user ${userId}, trying webhook fallback:`, err)
+      if (user.discordWebhookUrl) {
+        try {
+          await notifyFavoritesPrices(payload, user.discordWebhookUrl)
+          discordSuccess = true
+        } catch (webhookErr) {
+          console.error(`[collector] Discord webhook fallback also failed for user ${userId}:`, webhookErr)
+        }
+      }
+    }
+  } else if (user.discordWebhookUrl) {
     try {
       await notifyFavoritesPrices(payload, user.discordWebhookUrl)
       discordSuccess = true
     } catch (err) {
-      console.error(`[collector] Discord notification failed for user ${userId}:`, err)
+      console.error(`[collector] Discord webhook failed for user ${userId}:`, err)
     }
   }
 
@@ -545,6 +561,7 @@ export async function notifyFavoritesIfConfigured(saleDate?: string) {
       discordNotifyHour: null,
       OR: [
         { discordWebhookUrl: { not: null } },
+        { discordUserId: { not: null } },
         { pushSubscriptions: { some: {} } },
       ],
     },
