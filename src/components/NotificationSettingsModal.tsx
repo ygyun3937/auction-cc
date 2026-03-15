@@ -6,6 +6,7 @@ interface Settings {
   webhookUrl: string | null
   discordUserId: string | null
   discordUsername: string | null
+  discordBotInviteUrl: string | null
   lastNotifiedAt: string | null
   notifyHour: number | null
   notifyMinute: number | null
@@ -43,6 +44,7 @@ export default function NotificationSettingsModal({ onClose }: { onClose: () => 
   const [pushMessage, setPushMessage] = useState('')
   const [discordConnected, setDiscordConnected] = useState<string | null>(null)
   const [disconnectingDiscord, setDisconnectingDiscord] = useState(false)
+  const [showWebhookSection, setShowWebhookSection] = useState(false)
 
   useEffect(() => {
     fetch('/api/user/notification-settings')
@@ -56,9 +58,10 @@ export default function NotificationSettingsModal({ onClose }: { onClose: () => 
           data.notifyDays ? data.notifyDays.split(',').map(Number) : []
         )
         setDiscordConnected(data.discordUserId ? (data.discordUsername ?? data.discordUserId) : null)
+        if (data.webhookUrl) setShowWebhookSection(true)
       })
       .catch(() => {
-        setSettings({ webhookUrl: null, discordUserId: null, discordUsername: null, lastNotifiedAt: null, notifyHour: null, notifyMinute: null, notifyDays: null })
+        setSettings({ webhookUrl: null, discordUserId: null, discordUsername: null, discordBotInviteUrl: null, lastNotifiedAt: null, notifyHour: null, notifyMinute: null, notifyDays: null })
       })
 
     // Web Push 초기 로딩
@@ -336,24 +339,48 @@ export default function NotificationSettingsModal({ onClose }: { onClose: () => 
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Discord 계정을 연결하면 DM으로 알림을 받습니다</p>
-                  <a
-                    href="/api/auth/discord/connect"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium transition-colors"
-                  >
-                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.21.369-.444.85-.608 1.23a18.566 18.566 0 0 0-5.487 0 12.36 12.36 0 0 0-.617-1.23A.077.077 0 0 0 8.562 3c-1.714.29-3.354.8-4.885 1.491a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.08.08 0 0 0 .031.055 20.03 20.03 0 0 0 5.993 2.98.078.078 0 0 0 .084-.026c.462-.62.874-1.275 1.226-1.963.021-.04.001-.088-.041-.104a13.201 13.201 0 0 1-1.872-.878.075.075 0 0 1-.008-.125c.126-.093.252-.19.372-.287a.075.075 0 0 1 .078-.01c3.927 1.764 8.18 1.764 12.061 0a.075.075 0 0 1 .079.009c.12.098.245.195.372.288a.075.075 0 0 1-.006.125c-.598.344-1.22.635-1.873.877a.075.075 0 0 0-.041.105c.36.687.772 1.341 1.225 1.962a.077.077 0 0 0 .084.028 19.963 19.963 0 0 0 6.002-2.981.076.076 0 0 0 .032-.054c.5-5.094-.838-9.52-3.549-13.442a.06.06 0 0 0-.031-.028z"/>
-                    </svg>
-                    Discord로 연결하기
-                  </a>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Discord 계정을 연결하면 DM으로 알림을 받습니다</p>
+                    <a
+                      href="/api/auth/discord/connect"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium transition-colors shrink-0 ml-2"
+                    >
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.21.369-.444.85-.608 1.23a18.566 18.566 0 0 0-5.487 0 12.36 12.36 0 0 0-.617-1.23A.077.077 0 0 0 8.562 3c-1.714.29-3.354.8-4.885 1.491a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.08.08 0 0 0 .031.055 20.03 20.03 0 0 0 5.993 2.98.078.078 0 0 0 .084-.026c.462-.62.874-1.275 1.226-1.963.021-.04.001-.088-.041-.104a13.201 13.201 0 0 1-1.872-.878.075.075 0 0 1-.008-.125c.126-.093.252-.19.372-.287a.075.075 0 0 1 .078-.01c3.927 1.764 8.18 1.764 12.061 0a.075.075 0 0 1 .079.009c.12.098.245.195.372.288a.075.075 0 0 1-.006.125c-.598.344-1.22.635-1.873.877a.075.075 0 0 0-.041.105c.36.687.772 1.341 1.225 1.962a.077.077 0 0 0 .084.028 19.963 19.963 0 0 0 6.002-2.981.076.076 0 0 0 .032-.054c.5-5.094-.838-9.52-3.549-13.442a.06.06 0 0 0-.031-.028z"/>
+                      </svg>
+                      Discord로 연결하기
+                    </a>
+                  </div>
+                  {settings.discordBotInviteUrl && (
+                    <p className="text-xs text-gray-400 dark:text-gray-500">
+                      봇이 내 서버에 없다면{' '}
+                      <a
+                        href={settings.discordBotInviteUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-indigo-500 hover:text-indigo-700 underline"
+                      >
+                        먼저 초대하세요
+                      </a>
+                    </p>
+                  )}
                 </div>
               )}
             </div>
 
             {/* URL input / display */}
             <div className="mb-4">
-              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Discord 채널 웹훅 URL (레거시)</label>
+              <button
+                type="button"
+                onClick={() => setShowWebhookSection(v => !v)}
+                className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 mb-2"
+              >
+                <span>{showWebhookSection ? '▾' : '▸'}</span>
+                <span>웹훅 URL로 채널 알림 받기 (선택)</span>
+              </button>
+              {showWebhookSection && <>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Discord 채널 웹훅 URL</label>
               {settings.webhookUrl && !isEditing ? (
                 <div className="flex items-center gap-2">
                   <span className="flex-1 text-xs font-mono bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-gray-500 truncate">
@@ -378,6 +405,7 @@ export default function NotificationSettingsModal({ onClose }: { onClose: () => 
               <p className="text-xs text-gray-400 mt-1">
                 Discord 서버 설정 → 연동 → 웹후크에서 URL을 복사하세요
               </p>
+              </>}
             </div>
 
             {/* Last notified */}

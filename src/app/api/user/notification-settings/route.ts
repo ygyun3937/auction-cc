@@ -21,10 +21,16 @@ export async function GET() {
     },
   })
 
+  const clientId = process.env.DISCORD_CLIENT_ID
+  const discordBotInviteUrl = clientId
+    ? `https://discord.com/api/oauth2/authorize?client_id=${clientId}&scope=bot&permissions=0`
+    : null
+
   return NextResponse.json({
     webhookUrl: user?.discordWebhookUrl ?? null,
     discordUserId: user?.discordUserId ?? null,
     discordUsername: user?.discordUsername ?? null,
+    discordBotInviteUrl,
     lastNotifiedAt: user?.discordLastNotifiedAt?.toISOString() ?? null,
     notifyHour: user?.discordNotifyHour ?? null,
     notifyMinute: user?.discordNotifyMinute ?? null,
