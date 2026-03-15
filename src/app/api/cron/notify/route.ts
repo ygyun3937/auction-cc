@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
       discordNotifyMinute: { not: null },
       OR: [
         { discordWebhookUrl: { not: null } },
+        { discordUserId: { not: null } },
         { pushSubscriptions: { some: {} } },
       ],
     },
