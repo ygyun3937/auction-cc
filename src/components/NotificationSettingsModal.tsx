@@ -318,13 +318,22 @@ export default function NotificationSettingsModal({ onClose }: { onClose: () => 
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">DM으로 알림을 받습니다</p>
                   </div>
-                  <button
-                    onClick={handleDiscordDisconnect}
-                    disabled={disconnectingDiscord}
-                    className="text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 underline disabled:opacity-50"
-                  >
-                    {disconnectingDiscord ? '해제 중...' : '연결 해제'}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleTest}
+                      disabled={status === 'testing'}
+                      className="text-xs text-indigo-500 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 underline disabled:opacity-50"
+                    >
+                      {status === 'testing' ? '전송 중...' : '테스트'}
+                    </button>
+                    <button
+                      onClick={handleDiscordDisconnect}
+                      disabled={disconnectingDiscord}
+                      className="text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 underline disabled:opacity-50"
+                    >
+                      {disconnectingDiscord ? '해제 중...' : '연결 해제'}
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="flex items-center justify-between">
@@ -345,10 +354,10 @@ export default function NotificationSettingsModal({ onClose }: { onClose: () => 
             {/* URL input / display */}
             <div className="mb-4">
               <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Discord 채널 웹훅 URL (레거시)</label>
-              {isConfigured && !isEditing ? (
+              {settings.webhookUrl && !isEditing ? (
                 <div className="flex items-center gap-2">
                   <span className="flex-1 text-xs font-mono bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-gray-500 truncate">
-                    {maskUrl(settings.webhookUrl!)}
+                    {maskUrl(settings.webhookUrl)}
                   </span>
                   <button
                     onClick={() => { setIsEditing(true); setStatus('idle'); setMessage('') }}
