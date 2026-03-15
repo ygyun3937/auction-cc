@@ -16,11 +16,15 @@ export async function GET() {
       discordNotifyHour: true,
       discordNotifyMinute: true,
       discordNotifyDays: true,
+      discordUserId: true,
+      discordUsername: true,
     },
   })
 
   return NextResponse.json({
     webhookUrl: user?.discordWebhookUrl ?? null,
+    discordUserId: user?.discordUserId ?? null,
+    discordUsername: user?.discordUsername ?? null,
     lastNotifiedAt: user?.discordLastNotifiedAt?.toISOString() ?? null,
     notifyHour: user?.discordNotifyHour ?? null,
     notifyMinute: user?.discordNotifyMinute ?? null,
@@ -35,15 +39,22 @@ export async function PUT(req: Request) {
   const body = await req.json()
   const { webhookUrl, notifyHour, notifyMinute, notifyDays } = body
 
-  // 1. webhookUrl null/empty → cascade clear all schedule fields
+  // 1. webhookUrl null/empty → cascade clear schedule only if DM also not configured
   if (!webhookUrl) {
+    const current = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { discordUserId: true },
+    })
     await prisma.user.update({
       where: { id: session.user.id },
       data: {
         discordWebhookUrl: null,
-        discordNotifyHour: null,
-        discordNotifyMinute: null,
-        discordNotifyDays: null,
+        // Only clear schedule if DM is also not configured
+        ...(current?.discordUserId == null && {
+          discordNotifyHour: null,
+          discordNotifyMinute: null,
+          discordNotifyDays: null,
+        }),
       },
     })
     return NextResponse.json({ ok: true })

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/../auth'
 import { prisma } from '@/lib/db'
-import { sendTestMessage } from '@/lib/discord'
+import { sendTestMessage, sendTestDM } from '@/lib/discord'
 import { sendPushNotification } from '@/lib/webpush'
 
 export async function POST() {
@@ -11,12 +11,15 @@ export async function POST() {
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
     select: {
+      discordUserId: true,
       discordWebhookUrl: true,
       pushSubscriptions: { select: { endpoint: true, p256dh: true, auth: true } },
     },
   })
 
-  const hasDiscord = !!user?.discordWebhookUrl
+  const hasDiscordDM = !!user?.discordUserId
+  const hasDiscordWebhook = !!user?.discordWebhookUrl
+  const hasDiscord = hasDiscordDM || hasDiscordWebhook
   const hasPush = !!user?.pushSubscriptions?.length
 
   if (!hasDiscord && !hasPush) {
@@ -26,7 +29,16 @@ export async function POST() {
   let discordOk = false
   let pushOk = false
 
-  if (hasDiscord) {
+  // Discord: DM first, webhook fallback
+  if (hasDiscordDM) {
+    try {
+      await sendTestDM(user!.discordUserId!)
+      discordOk = true
+    } catch {
+      // DM failed — try webhook fallback
+    }
+  }
+  if (!discordOk && hasDiscordWebhook) {
     try {
       await sendTestMessage(user!.discordWebhookUrl!)
       discordOk = true
