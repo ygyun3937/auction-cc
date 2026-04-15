@@ -15,23 +15,21 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: auction-monitor/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: auction-monitor
         run: npm ci
 
       - name: Build
-        working-directory: auction-monitor
         run: npm run build
         env:
           NODE_ENV: production
 
       - name: Prepare bundle
         run: |
-          cp -r auction-monitor/.next/static auction-monitor/.next/standalone/.next/static
-          cp -r auction-monitor/public auction-monitor/.next/standalone/public
-          cp -r auction-monitor/prisma auction-monitor/.next/standalone/prisma
+          cp -r .next/static .next/standalone/.next/static
+          cp -r public .next/standalone/public
+          cp -r prisma .next/standalone/prisma
 
       - name: Setup SSH
         uses: webfactory/ssh-agent@v0.9.0
@@ -47,12 +45,12 @@ jobs:
       - name: Copy config files to server
         run: |
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "mkdir -p ~/auction-monitor"
-          rsync -az .env.prod auction-monitor/docker-compose.prod.yml \
+          rsync -az .env.prod docker-compose.prod.yml \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/auction-monitor/
 
       - name: Copy bundle to server
         run: |
-          rsync -az --delete auction-monitor/.next/standalone/ \
+          rsync -az --delete .next/standalone/ \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/auction-monitor/bundle/
 
       - name: Start services
