@@ -66,5 +66,5 @@ jobs:
               -v \$(pwd)/bundle/prisma:/app/prisma \
               -w /app \
               --env-file .env.prod \
-              node:20 \
+              node:20-bullseye \
               sh -c 'npx --yes prisma@5 migrate deploy'"
