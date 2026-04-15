@@ -1,6 +1,6 @@
 services:
   app:
-    image: node:20-alpine
+    image: node:20-slim
     container_name: auction-app
     working_dir: /app
     command: node server.js

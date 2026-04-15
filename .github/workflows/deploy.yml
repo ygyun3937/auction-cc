@@ -61,5 +61,10 @@ jobs:
       - name: Run migrations
         run: |
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            "docker compose -f ~/auction-monitor/docker-compose.prod.yml exec -T app \
-              npx --yes prisma@5 migrate deploy"
+            "cd ~/auction-monitor && docker run --rm \
+              --network auction-monitor_default \
+              -v \$(pwd)/bundle/prisma:/app/prisma \
+              -w /app \
+              --env-file .env.prod \
+              node:20-slim \
+              sh -c 'npx --yes prisma@5 migrate deploy'"
