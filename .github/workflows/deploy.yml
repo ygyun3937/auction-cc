@@ -1,0 +1,67 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: auction-monitor/package-lock.json
+
+      - name: Install dependencies
+        working-directory: auction-monitor
+        run: npm ci
+
+      - name: Build
+        working-directory: auction-monitor
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Prepare bundle
+        run: |
+          cp -r auction-monitor/.next/static auction-monitor/.next/standalone/.next/static
+          cp -r auction-monitor/public auction-monitor/.next/standalone/public
+          cp -r auction-monitor/prisma auction-monitor/.next/standalone/prisma
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add server to known_hosts
+        run: ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Write .env.prod
+        run: echo "${{ secrets.APP_ENV }}" > .env.prod
+
+      - name: Copy config files to server
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "mkdir -p ~/auction-monitor"
+          rsync -az .env.prod auction-monitor/docker-compose.prod.yml \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/auction-monitor/
+
+      - name: Copy bundle to server
+        run: |
+          rsync -az --delete auction-monitor/.next/standalone/ \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/auction-monitor/bundle/
+
+      - name: Start services
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "cd ~/auction-monitor && docker compose -f docker-compose.prod.yml up -d"
+
+      - name: Run migrations
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "docker compose -f ~/auction-monitor/docker-compose.prod.yml exec -T app \
+              npx --yes prisma@5 migrate deploy"
