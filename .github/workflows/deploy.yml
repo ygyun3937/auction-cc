@@ -60,11 +60,7 @@ jobs:
 
       - name: Run migrations
         run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            "cd ~/auction-monitor && docker run --rm \
-              --network auction-monitor_default \
-              -v \$(pwd)/bundle/prisma:/app/prisma \
-              -w /app \
-              --env-file .env.prod \
-              node:20-bullseye \
-              sh -c 'npx --yes prisma@5 migrate deploy'"
+          ssh -f -N -L 5432:localhost:5432 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}
+          sleep 3
+          DB_URL=$(printf '%s' "${{ secrets.APP_ENV }}" | grep '^DATABASE_URL=' | cut -d= -f2- | sed 's|@postgres:|@localhost:|')
+          DATABASE_URL="$DB_URL" npx --yes prisma@5 migrate deploy
