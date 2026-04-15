@@ -67,4 +67,4 @@ jobs:
               -w /app \
               --env-file .env.prod \
               node:20-slim \
-              sh -c 'npx --yes prisma@5 migrate deploy'"
+              sh -c 'apt-get update -y && apt-get install -y openssl && npx --yes prisma@5 migrate deploy'"
