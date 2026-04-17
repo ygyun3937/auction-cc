@@ -240,16 +240,16 @@ export function MarketsMap({ markets, nationwide }: Props) {
 
       {/* Map */}
       <div className="relative">
-        <div ref={mapRef} style={{ width: '100%', height: '420px' }} />
+        <div ref={mapRef} style={{ width: '100%', height: '540px' }} />
 
         {/* Overlay: seasonal + all products */}
         <div className="absolute bottom-0 left-0 right-0 z-[1000] pointer-events-auto"
-          style={{ background: 'linear-gradient(to top, rgba(15,23,42,.97) 70%, transparent)', padding: '24px 12px 12px' }}>
+          style={{ background: 'linear-gradient(to top, rgba(15,23,42,.95) 60%, transparent)', padding: '20px 12px 10px' }}>
 
           {/* Seasonal strip */}
           {seasonalProducts.length > 0 && (
-            <div className="mb-2">
-              <div className="text-xs font-bold text-green-400 tracking-wide mb-1.5">
+            <div className="mb-1.5">
+              <div className="text-xs font-bold text-green-400 tracking-wide mb-1">
                 🌿 {month}월 제철
               </div>
               <div className="flex gap-1.5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
@@ -257,15 +257,17 @@ export function MarketsMap({ markets, nationwide }: Props) {
                   <button
                     key={p.productCode}
                     onClick={() => activeProduct?.productCode === p.productCode ? clearFilter() : applyFilter(p, true)}
-                    className={`flex-shrink-0 rounded-lg px-2.5 py-1.5 text-left transition-all border ${
+                    className={`flex-shrink-0 rounded-lg px-2.5 py-1 text-left transition-all border ${
                       activeProduct?.productCode === p.productCode
                         ? 'border-amber-400 bg-amber-400/10'
                         : 'border-green-800 bg-green-900/40 hover:border-green-500'
                     }`}
                   >
-                    <div className="text-xs font-bold text-green-100 whitespace-nowrap">{p.productName}</div>
-                    <div className={`text-xs font-bold tabular-nums ${chipColor(p.change1d)}`}>
-                      {Math.round(p.todayAvg).toLocaleString()}
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs font-bold text-green-100 whitespace-nowrap">{p.productName}</span>
+                      <span className={`text-xs font-bold tabular-nums ${chipColor(p.change1d)}`}>
+                        {Math.round(p.todayAvg).toLocaleString()}
+                      </span>
                     </div>
                   </button>
                 ))}
@@ -273,29 +275,27 @@ export function MarketsMap({ markets, nationwide }: Props) {
             </div>
           )}
 
-          {/* Divider */}
-          <div className="border-t border-gray-700/50 my-2" />
-
           {/* All products strip */}
           <div>
-            <div className="text-xs text-gray-500 mb-1.5">전체 품목</div>
+            <div className="text-xs text-gray-500 mb-1">전체 품목</div>
             <div className="flex gap-1.5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
               {otherProducts.slice(0, 20).map(p => (
                 <button
                   key={p.productCode}
                   onClick={() => activeProduct?.productCode === p.productCode ? clearFilter() : applyFilter(p, false)}
-                  className={`flex-shrink-0 rounded-md px-2 py-1.5 text-left transition-all border ${
+                  className={`flex-shrink-0 rounded-md px-2 py-1 text-left transition-all border ${
                     activeProduct?.productCode === p.productCode
                       ? 'border-amber-400 bg-amber-400/10'
                       : 'border-gray-700 bg-gray-800/70 hover:border-gray-500'
                   }`}
-                  style={{ minWidth: '60px' }}
+                  style={{ minWidth: '56px' }}
                 >
-                  <div className="text-xs font-bold text-gray-200 whitespace-nowrap">{p.productName}</div>
-                  <div className={`text-xs font-bold tabular-nums ${chipColor(p.change1d)}`}>
-                    {Math.round(p.todayAvg).toLocaleString()}
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs font-bold text-gray-200 whitespace-nowrap">{p.productName}</span>
+                    <span className={`text-xs font-bold tabular-nums ${chipColor(p.change1d)}`}>
+                      {fmtChg(p.change1d)}
+                    </span>
                   </div>
-                  <div className={`text-xs ${chipColor(p.change1d)}`}>{fmtChg(p.change1d)}</div>
                 </button>
               ))}
             </div>
