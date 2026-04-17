@@ -1,7 +1,7 @@
 import { getAllMarkets } from '@/services/market.service'
 import Link from 'next/link'
 
-export const revalidate = 3600
+export const dynamic = 'force-dynamic'
 
 export default async function MarketsPage() {
   let markets: Awaited<ReturnType<typeof getAllMarkets>> = []

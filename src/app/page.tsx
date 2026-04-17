@@ -2,7 +2,7 @@ import { getDashboardSummary, getNationwidePrices } from '@/services/price.servi
 import { DashboardClient } from '@/components/dashboard/dashboard-client'
 import type { NationwideProductPrice } from '@/types'
 
-export const revalidate = 600 // 10분 ISR
+export const dynamic = 'force-dynamic'
 
 export default async function HomePage() {
   let summary = null
