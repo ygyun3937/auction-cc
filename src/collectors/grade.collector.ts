@@ -21,6 +21,7 @@ interface KatOriginItem {
   gds_sclsf_nm: string    // 소분류명
   grd_cd: string          // 등급코드
   grd_nm: string          // 등급명
+  plor_nm?: string        // 산지명 (출하지)
   qty: string             // 물량
   scsbd_prc: string       // 낙찰가격
   unit_nm: string         // 단위
@@ -65,6 +66,9 @@ export async function collectGradeData(targetDate?: string): Promise<{
 
     console.log(`[grade-collector] Fetched ${allItems.length} grade items`)
     recordCount = await upsertGradeDailyPrices(allItems, saleDate)
+
+    const originCount = await upsertOriginDailyPrices(allItems, saleDate)
+    console.log(`[grade-collector] Origin records: ${originCount}`)
 
     // Invalidate grade cache
     const { deleteCache } = await import('@/lib/redis')
@@ -163,6 +167,54 @@ async function upsertGradeDailyPrices(items: KatOriginItem[], saleDate: string):
       where: { uq_grade_daily_price: { productId: product.id, priceDate, gradeCode } },
       update: { avgPrice, minPrice, maxPrice, totalVolume: agg.totalQty, gradeName: agg.gradeName },
       create: { productId: product.id, priceDate, gradeCode, gradeName: agg.gradeName, avgPrice, minPrice, maxPrice, totalVolume: agg.totalQty },
+    })
+    count++
+  }
+  return count
+}
+
+async function upsertOriginDailyPrices(items: KatOriginItem[], saleDate: string): Promise<number> {
+  type Agg = { prices: number[]; totalQty: number }
+  const map = new Map<string, Agg>() // key: `${productCode}::${originName}`
+
+  for (const item of items) {
+    const rawPrice = parseFloat(item.scsbd_prc)
+    const unitQty = parseFloat(item.unit_qty) || 1
+    const qty = parseFloat(item.qty) || 1
+    if (isNaN(rawPrice) || rawPrice <= 0) continue
+    if (!item.plor_nm || item.plor_nm === '-' || item.plor_nm === '') continue
+    if (!item.gds_mclsf_cd || !item.gds_mclsf_nm || item.gds_mclsf_nm === '-') continue
+
+    const price = rawPrice / unitQty
+    const catCode = item.gds_lclsf_cd || '00'
+    const productCode = `${catCode}-${item.gds_mclsf_cd}`
+    const key = `${productCode}::${item.plor_nm}`
+    const existing = map.get(key)
+    if (existing) {
+      existing.prices.push(price)
+      existing.totalQty += qty
+    } else {
+      map.set(key, { prices: [price], totalQty: qty })
+    }
+  }
+
+  const priceDate = new Date(saleDate)
+  let count = 0
+  for (const [key, agg] of map.entries()) {
+    if (agg.totalQty < MIN_VOLUME) continue
+    const [productCode, originName] = key.split('::')
+    const product = await prisma.product.findUnique({ where: { code: productCode } })
+    if (!product) continue
+
+    const filtered = removeOutliers(agg.prices)
+    const avgPrice = filtered.reduce((s, p) => s + p, 0) / filtered.length
+    const minPrice = Math.min(...filtered)
+    const maxPrice = Math.max(...filtered)
+
+    await prisma.originDailyPrice.upsert({
+      where: { uq_origin_daily_price: { productId: product.id, priceDate, originName } },
+      update: { avgPrice, minPrice, maxPrice, totalVolume: agg.totalQty },
+      create: { productId: product.id, priceDate, originName, avgPrice, minPrice, maxPrice, totalVolume: agg.totalQty },
     })
     count++
   }
