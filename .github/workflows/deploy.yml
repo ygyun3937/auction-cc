@@ -62,7 +62,8 @@ jobs:
       - name: Start services
         run: |
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            "cd ~/auction-monitor && docker compose -f docker-compose.prod.yml up -d"
+            "cd ~/auction-monitor && docker compose -f docker-compose.prod.yml up -d && \
+             docker compose -f docker-compose.prod.yml up -d --force-recreate app"
 
       - name: Run migrations
         run: |
