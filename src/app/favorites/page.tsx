@@ -16,7 +16,7 @@ export default async function FavoritesPage() {
     orderBy: { createdAt: 'desc' },
   })
 
-  const productCodes = favorites.map(f => f.productCode)
+  const productCodes = favorites.map((f: typeof favorites[number]) => f.productCode)
 
   const allPrices = productCodes.length > 0 ? await getNationwidePrices() : []
   const priceMap = new Map(allPrices.map(p => [p.productCode, p]))

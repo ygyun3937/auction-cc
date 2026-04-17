@@ -10,7 +10,7 @@ export async function GET() {
     where: { userId: session.user.id },
     orderBy: { createdAt: 'desc' },
   })
-  return NextResponse.json(favorites.map(f => f.productCode))
+  return NextResponse.json(favorites.map((f: typeof favorites[number]) => f.productCode))
 }
 
 export async function POST(req: Request) {

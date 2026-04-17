@@ -12,7 +12,7 @@ export async function GET() {
     select: { endpoint: true },
   })
 
-  return NextResponse.json({ endpoints: subs.map(s => s.endpoint) })
+  return NextResponse.json({ endpoints: subs.map((s: typeof subs[number]) => s.endpoint) })
 }
 
 // POST: 새 구독 등록 (같은 userId+endpoint면 upsert, 다른 userId면 409)
