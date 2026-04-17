@@ -1,7 +1,8 @@
 import { getProductByCode } from '@/services/product.service'
-import { getPriceTrend, getPrices, getVarietyPrices, getGradePrices } from '@/services/price.service'
+import { getPriceTrend, getPrices, getVarietyPrices, getGradePrices, getOriginPrices } from '@/services/price.service'
 import { PriceTrendChart } from '@/components/charts/price-trend-chart'
 import { FavoriteButton } from '@/components/products/favorite-button'
+import { isSeasonalProduct } from '@/lib/seasonal'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 
@@ -39,15 +40,17 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
   let recentPrices: Awaited<ReturnType<typeof getPrices>>['data'] = []
   let varietyPrices: Awaited<ReturnType<typeof getVarietyPrices>> = []
   let gradePrices: Awaited<ReturnType<typeof getGradePrices>> = []
+  let originPrices: Awaited<ReturnType<typeof getOriginPrices>> = []
 
   try {
     product = await getProductByCode(code)
     if (!product) notFound()
-    ;[trend, { data: recentPrices }, varietyPrices, gradePrices] = await Promise.all([
+    ;[trend, { data: recentPrices }, varietyPrices, gradePrices, originPrices] = await Promise.all([
       getPriceTrend({ productCode: code, days }),
       getPrices({ productCode: code, limit: 50 }),
       getVarietyPrices(code),
       getGradePrices(code),
+      getOriginPrices(code),
     ])
   } catch {
     if (!product) notFound()
@@ -90,6 +93,12 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
         <span>›</span>
         <span className="text-gray-700 dark:text-gray-300 font-medium">{product?.name}</span>
       </div>
+
+      {product && isSeasonalProduct(product.name) && (
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 text-sm font-semibold mb-4">
+          🌿 {new Date().getMonth() + 1}월 제철 품목
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex items-start justify-between mb-5">
@@ -246,6 +255,73 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{g.totalVolume.toLocaleString()}박스</p>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Origin breakdown */}
+      {originPrices.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm mb-4">
+          <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">산지별 가격</h2>
+            <span className="text-xs text-gray-400 dark:text-gray-500">{originPrices[0]?.priceDate} 기준 · 상위 {originPrices.length}개 산지</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50/50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-700">
+                  <th className="px-4 py-2.5 text-left text-xs text-gray-500 dark:text-gray-400 font-medium">산지</th>
+                  <th className="px-4 py-2.5 text-right text-xs text-gray-500 dark:text-gray-400 font-medium">평균가 (원/{product?.unit})</th>
+                  <th className="px-4 py-2.5 text-right text-xs text-gray-500 dark:text-gray-400 font-medium hidden sm:table-cell">최저가</th>
+                  <th className="px-4 py-2.5 text-right text-xs text-gray-500 dark:text-gray-400 font-medium hidden sm:table-cell">최고가</th>
+                  <th className="px-4 py-2.5 text-right text-xs text-gray-500 dark:text-gray-400 font-medium hidden md:table-cell">거래량</th>
+                  <th className="px-4 py-2.5 text-right text-xs text-gray-500 dark:text-gray-400 font-medium hidden lg:table-cell">비중</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
+                {(() => {
+                  const totalVol = originPrices.reduce((s, o) => s + o.totalVolume, 0)
+                  const maxAvg = Math.max(...originPrices.map(o => o.avgPrice), 1)
+                  return originPrices.map(o => {
+                    const pct = Math.round((o.totalVolume / totalVol) * 100)
+                    const barWidth = Math.round((o.avgPrice / maxAvg) * 100)
+                    return (
+                      <tr key={o.originName} className="hover:bg-gray-50/70 dark:hover:bg-gray-800/70 transition-colors">
+                        <td className="px-4 py-2.5 text-sm font-medium text-gray-800 dark:text-gray-200">
+                          <div className="flex items-center gap-2">
+                            <span>{o.originName}</span>
+                            <div className="hidden sm:block w-16 h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                              <div className="h-full bg-green-400 rounded-full" style={{ width: `${barWidth}%` }} />
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-sm font-semibold text-gray-900 dark:text-gray-100 tabular-nums">
+                          {Math.round(o.avgPrice).toLocaleString()}원
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-xs text-blue-500 tabular-nums hidden sm:table-cell">
+                          {Math.round(o.minPrice).toLocaleString()}원
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-xs text-red-400 tabular-nums hidden sm:table-cell">
+                          {Math.round(o.maxPrice).toLocaleString()}원
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-xs text-gray-500 dark:text-gray-400 tabular-nums hidden md:table-cell">
+                          {o.totalVolume.toLocaleString()}박스
+                        </td>
+                        <td className="px-4 py-2.5 text-right hidden lg:table-cell">
+                          <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium ${
+                            pct >= 30 ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                            pct >= 10 ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' :
+                            'bg-gray-50 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+                          }`}>
+                            {pct}%
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })
+                })()}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

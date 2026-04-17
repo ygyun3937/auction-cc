@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import type { NationwideProductPrice } from '@/types'
+import { isSeasonalProduct } from '@/lib/seasonal'
 
 interface Props {
   items: NationwideProductPrice[]
@@ -88,7 +89,10 @@ export function NationwidePrices({ items }: Props) {
                 href={`/products/${item.productCode}`}
                 className="flex items-center justify-between hover:bg-red-50 dark:hover:bg-gray-700 rounded px-1 py-0.5 transition-colors"
               >
-                <span className="text-sm text-gray-700 dark:text-gray-300">{item.productName}</span>
+                <span className="flex items-center gap-1 text-sm text-gray-700 dark:text-gray-300">
+                  {item.productName}
+                  {isSeasonalProduct(item.productName) && <span className="text-xs">🌿</span>}
+                </span>
                 <span className="text-xs font-semibold text-red-500">
                   ▲ {Math.abs(item.change7d ?? 0).toFixed(1)}%
                 </span>
@@ -105,7 +109,10 @@ export function NationwidePrices({ items }: Props) {
                 href={`/products/${item.productCode}`}
                 className="flex items-center justify-between hover:bg-blue-50 dark:hover:bg-gray-700 rounded px-1 py-0.5 transition-colors"
               >
-                <span className="text-sm text-gray-700 dark:text-gray-300">{item.productName}</span>
+                <span className="flex items-center gap-1 text-sm text-gray-700 dark:text-gray-300">
+                  {item.productName}
+                  {isSeasonalProduct(item.productName) && <span className="text-xs">🌿</span>}
+                </span>
                 <span className="text-xs font-semibold text-blue-500">
                   ▼ {Math.abs(item.change7d ?? 0).toFixed(1)}%
                 </span>
@@ -169,8 +176,11 @@ export function NationwidePrices({ items }: Props) {
                     <td className="px-4 py-3">
                       <Link href={`/products/${item.productCode}`} className="group">
                         <div className="flex items-center gap-1.5">
-                          <p className="font-medium text-gray-900 dark:text-gray-100 group-hover:text-green-700 dark:group-hover:text-green-400 transition-colors">
+                          <p className="font-medium text-gray-900 dark:text-gray-100 group-hover:text-green-700 dark:group-hover:text-green-400 transition-colors flex items-center gap-1">
                             {item.productName}
+                            {isSeasonalProduct(item.productName) && (
+                              <span className="text-xs" title={`${new Date().getMonth() + 1}월 제철`}>🌿</span>
+                            )}
                           </p>
                           {item.excludedMarkets > 0 && (
                             <span
