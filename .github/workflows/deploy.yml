@@ -56,7 +56,7 @@ jobs:
 
       - name: Copy bundle to server
         run: |
-          rsync -az --delete .next/standalone/ \
+          rsync -az --delete --exclude='.next/cache' .next/standalone/ \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/auction-monitor/bundle/
 
       - name: Start services
