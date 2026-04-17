@@ -14,7 +14,7 @@ export function Header() {
             <Link href="/" className="flex items-center gap-2">
               <span className="text-2xl">🌾</span>
               <span className="font-bold text-lg hidden sm:block">전국 농수산물 경매 모니터링</span>
-              <span className="font-bold text-base sm:hidden">경매 모니터링</span>
+              <span className="font-bold text-base sm:hidden whitespace-nowrap">경매 모니터링</span>
             </Link>
           </div>
           <nav className="hidden md:flex items-center gap-6 text-sm">
@@ -22,10 +22,8 @@ export function Header() {
             <Link href="/products" className="hover:text-green-200 transition-colors">품목별 가격</Link>
             <Link href="/markets" className="hover:text-green-200 transition-colors">시장별 현황</Link>
           </nav>
-          <div className="flex items-center gap-2">
-            <div className="w-36 sm:w-48 md:w-64">
-              <SearchBar />
-            </div>
+          <div className="flex items-center gap-1">
+            <SearchBar />
             <ThemeToggle />
             <AuthButton />
           </div>

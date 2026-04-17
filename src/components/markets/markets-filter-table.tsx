@@ -5,12 +5,13 @@ import type { MarketProductPrice } from '@/types'
 
 interface Props {
   productName: string
+  unit: string
   markets: MarketProductPrice[]
   selectedCode: string | null
   onSelect: (code: string) => void
 }
 
-export function MarketsFilterTable({ productName, markets, selectedCode, onSelect }: Props) {
+export function MarketsFilterTable({ productName, unit, markets, selectedCode, onSelect }: Props) {
   if (markets.length === 0) return null
 
   const maxPrice = Math.max(...markets.map(m => m.avgPrice), 1)
@@ -61,9 +62,10 @@ export function MarketsFilterTable({ productName, markets, selectedCode, onSelec
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm font-bold tabular-nums text-gray-900 dark:text-gray-100">
                     {m.avgPrice.toLocaleString()}원
+                    <span className="text-xs font-normal text-gray-400 dark:text-gray-500 ml-0.5">/{unit}</span>
                   </span>
                   <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">
-                    {m.minPrice.toLocaleString()} ~ {m.maxPrice.toLocaleString()}
+                    {m.minPrice.toLocaleString()} ~ {m.maxPrice.toLocaleString()}원
                   </span>
                 </div>
                 <div className="h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">

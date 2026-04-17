@@ -21,6 +21,7 @@ interface MarkerEntry {
 interface ActiveProduct {
   productCode: string
   productName: string
+  unit: string
   isSeasonal: boolean
 }
 
@@ -84,7 +85,7 @@ export function MarketsMap({ markets, nationwide }: Props) {
   }, [])
 
   const applyFilter = useCallback(async (prod: NationwideProductPrice, isSeasonal: boolean) => {
-    setActiveProduct({ productCode: prod.productCode, productName: prod.productName, isSeasonal })
+    setActiveProduct({ productCode: prod.productCode, productName: prod.productName, unit: prod.unit, isSeasonal })
     setSelectedMarketCode(null)
     setLoadingFilter(true)
 
@@ -182,9 +183,10 @@ export function MarketsMap({ markets, nationwide }: Props) {
         const marker = L.marker([coords.lat, coords.lng], { icon }).addTo(map)
         marker.bindPopup(`
           <div style="font-size:13px;font-weight:700;color:#f1f5f9">${escHtml(m.name)}</div>
-          <div style="font-size:11px;color:#4ade80;margin-top:1px">${escHtml(m.region)}</div>
-          ${m.address ? `<div style="font-size:10px;color:#64748b;margin-top:4px">${escHtml(m.address)}</div>` : ''}
-        `)
+          <div style="font-size:11px;color:#4ade80;margin-top:2px">${escHtml(m.region)}</div>
+          ${m.address ? `<div style="font-size:10px;color:#64748b;margin-top:5px">${escHtml(m.address)}</div>` : ''}
+          <a href="/markets/${escHtml(m.code)}" style="display:block;margin-top:7px;font-size:11px;color:#60a5fa;border-top:1px solid #334155;padding-top:6px;text-decoration:none">→ 시장 상세 보기</a>
+        `, { className: 'markets-popup' })
 
         const entry: MarkerEntry = { marker, code: m.code, region: m.region, name: m.name, lat: coords.lat, lng: coords.lng }
         markersRef.current.set(m.code, entry)
@@ -205,113 +207,128 @@ export function MarketsMap({ markets, nationwide }: Props) {
   }, [markets])
 
   function chipColor(change: number | null) {
-    if (change == null || Math.abs(change) < 0.5) return 'text-gray-400'
-    return change > 0 ? 'text-red-400' : 'text-blue-400'
+    if (change == null || Math.abs(change) < 0.5) return 'text-gray-400 dark:text-gray-500'
+    return change > 0 ? 'text-red-500 dark:text-red-400' : 'text-blue-500 dark:text-blue-400'
   }
   function fmtChg(c: number | null) {
     if (c == null) return '—'
-    return (c > 0 ? '▲' : c < 0 ? '▼' : '') + Math.abs(c).toFixed(1) + '%'
+    return (c > 0 ? '▲ ' : c < 0 ? '▼ ' : '') + Math.abs(c).toFixed(1) + '%'
   }
 
   return (
-    <div className="rounded-xl overflow-hidden border border-gray-100 dark:border-gray-700 shadow-sm">
-      {/* Filter status bar */}
-      {activeProduct && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 dark:bg-amber-900/10 border-b border-amber-200 dark:border-amber-800 text-sm">
-          <span className="font-bold text-amber-600 dark:text-amber-400">
-            {activeProduct.isSeasonal ? '🌿 ' : ''}{activeProduct.productName}
-          </span>
-          {activeProduct.isSeasonal && (
-            <span className="text-xs font-semibold text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-full px-2 py-0.5">
-              제철
-            </span>
-          )}
-          <span className="text-gray-500 dark:text-gray-400 text-xs">
-            {loadingFilter ? '로딩 중...' : `${filterMarkets.length}개 시장 거래`}
-          </span>
-          <button
-            onClick={clearFilter}
-            className="ml-auto text-xs text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 border border-gray-200 dark:border-gray-600 rounded px-2 py-0.5"
-          >
-            ✕ 해제
-          </button>
+    <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-4 items-start">
+      {/* LEFT: Filter panel */}
+      <div
+        className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm overflow-hidden flex flex-col lg:sticky lg:top-4"
+        style={{ maxHeight: '600px' }}
+      >
+        <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+          <span className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide">품목 필터</span>
         </div>
-      )}
-
-      {/* Map */}
-      <div className="relative">
-        <div ref={mapRef} style={{ width: '100%', height: '540px' }} />
-
-        {/* Overlay: seasonal + all products */}
-        <div className="absolute bottom-0 left-0 right-0 z-[1000] pointer-events-auto"
-          style={{ background: 'linear-gradient(to top, rgba(15,23,42,.95) 60%, transparent)', padding: '20px 12px 10px' }}>
-
-          {/* Seasonal strip */}
+        <div className="overflow-y-auto flex-1">
           {seasonalProducts.length > 0 && (
-            <div className="mb-1.5">
-              <div className="text-xs font-bold text-green-400 tracking-wide mb-1">
-                🌿 {month}월 제철
+            <>
+              <div className="px-4 pt-3 pb-1">
+                <span className="text-xs font-bold text-green-600 dark:text-green-400">🌿 {month}월 제철</span>
               </div>
-              <div className="flex gap-1.5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-                {seasonalProducts.map(p => (
+              {seasonalProducts.map(p => {
+                const isActive = activeProduct?.productCode === p.productCode
+                return (
                   <button
                     key={p.productCode}
-                    onClick={() => activeProduct?.productCode === p.productCode ? clearFilter() : applyFilter(p, true)}
-                    className={`flex-shrink-0 rounded-lg px-2.5 py-1 text-left transition-all border ${
-                      activeProduct?.productCode === p.productCode
-                        ? 'border-amber-400 bg-amber-400/10'
-                        : 'border-green-800 bg-green-900/40 hover:border-green-500'
+                    onClick={() => isActive ? clearFilter() : applyFilter(p, true)}
+                    className={`w-full flex items-center justify-between px-4 py-2.5 text-left transition-colors border-l-2 ${
+                      isActive
+                        ? 'bg-amber-50 dark:bg-amber-900/20 border-l-amber-400'
+                        : 'border-l-transparent hover:bg-gray-50 dark:hover:bg-gray-700/50'
                     }`}
                   >
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs font-bold text-green-100 whitespace-nowrap">{p.productName}</span>
-                      <span className={`text-xs font-bold tabular-nums ${chipColor(p.change1d)}`}>
+                    <span className={`text-sm font-semibold ${isActive ? 'text-amber-700 dark:text-amber-300' : 'text-gray-800 dark:text-gray-200'}`}>
+                      {p.productName}
+                    </span>
+                    <div className="text-right ml-2">
+                      <div className="text-xs font-bold tabular-nums text-gray-700 dark:text-gray-300">
                         {Math.round(p.todayAvg).toLocaleString()}
-                      </span>
+                        <span className="text-gray-400 dark:text-gray-500 font-normal">원/{p.unit}</span>
+                      </div>
+                      <div className={`text-xs font-semibold ${chipColor(p.change1d)}`}>{fmtChg(p.change1d)}</div>
                     </div>
                   </button>
-                ))}
-              </div>
-            </div>
+                )
+              })}
+            </>
           )}
-
-          {/* All products strip */}
-          <div>
-            <div className="text-xs text-gray-500 mb-1">전체 품목</div>
-            <div className="flex gap-1.5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-              {otherProducts.slice(0, 20).map(p => (
-                <button
-                  key={p.productCode}
-                  onClick={() => activeProduct?.productCode === p.productCode ? clearFilter() : applyFilter(p, false)}
-                  className={`flex-shrink-0 rounded-md px-2 py-1 text-left transition-all border ${
-                    activeProduct?.productCode === p.productCode
-                      ? 'border-amber-400 bg-amber-400/10'
-                      : 'border-gray-700 bg-gray-800/70 hover:border-gray-500'
-                  }`}
-                  style={{ minWidth: '56px' }}
-                >
-                  <div className="flex items-center gap-1">
-                    <span className="text-xs font-bold text-gray-200 whitespace-nowrap">{p.productName}</span>
-                    <span className={`text-xs font-bold tabular-nums ${chipColor(p.change1d)}`}>
-                      {fmtChg(p.change1d)}
-                    </span>
-                  </div>
-                </button>
-              ))}
-            </div>
+          <div className="h-px bg-gray-100 dark:bg-gray-700 mx-4 my-1" />
+          <div className="px-4 pt-3 pb-1">
+            <span className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide">전체 품목</span>
           </div>
+          {otherProducts.slice(0, 20).map(p => {
+            const isActive = activeProduct?.productCode === p.productCode
+            return (
+              <button
+                key={p.productCode}
+                onClick={() => isActive ? clearFilter() : applyFilter(p, false)}
+                className={`w-full flex items-center justify-between px-4 py-2.5 text-left transition-colors border-l-2 ${
+                  isActive
+                    ? 'bg-amber-50 dark:bg-amber-900/20 border-l-amber-400'
+                    : 'border-l-transparent hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                }`}
+              >
+                <span className={`text-sm font-semibold ${isActive ? 'text-amber-700 dark:text-amber-300' : 'text-gray-800 dark:text-gray-200'}`}>
+                  {p.productName}
+                </span>
+                <div className="text-right ml-2">
+                  <div className="text-xs font-bold tabular-nums text-gray-700 dark:text-gray-300">
+                    {Math.round(p.todayAvg).toLocaleString()}
+                    <span className="text-gray-400 dark:text-gray-500 font-normal">원/{p.unit}</span>
+                  </div>
+                  <div className={`text-xs font-semibold ${chipColor(p.change1d)}`}>{fmtChg(p.change1d)}</div>
+                </div>
+              </button>
+            )
+          })}
+          <div className="h-4" />
         </div>
       </div>
 
-      {/* Filter table (shown when product selected) */}
-      {activeProduct && !loadingFilter && filterMarkets.length > 0 && (
-        <MarketsFilterTable
-          productName={activeProduct.productName}
-          markets={filterMarkets}
-          selectedCode={selectedMarketCode}
-          onSelect={selectMarket}
-        />
-      )}
+      {/* RIGHT: Map + Table */}
+      <div className="flex flex-col gap-3">
+        {activeProduct && (
+          <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-lg text-sm">
+            {activeProduct.isSeasonal && <span>🌿</span>}
+            <span className="font-bold text-amber-700 dark:text-amber-400">{activeProduct.productName}</span>
+            <span className="text-xs text-gray-400 dark:text-gray-500">원/{activeProduct.unit}</span>
+            {activeProduct.isSeasonal && (
+              <span className="text-xs font-semibold text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-full px-2 py-0.5">
+                제철
+              </span>
+            )}
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              {loadingFilter ? '로딩 중...' : `${filterMarkets.length}개 시장 거래`}
+            </span>
+            <button
+              onClick={clearFilter}
+              className="ml-auto text-xs text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 border border-gray-200 dark:border-gray-600 rounded px-2 py-0.5"
+            >
+              ✕ 해제
+            </button>
+          </div>
+        )}
+
+        <div className="rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm">
+          <div ref={mapRef} style={{ width: '100%', height: '440px' }} />
+        </div>
+
+        {activeProduct && !loadingFilter && filterMarkets.length > 0 && (
+          <MarketsFilterTable
+            productName={activeProduct.productName}
+            unit={activeProduct.unit}
+            markets={filterMarkets}
+            selectedCode={selectedMarketCode}
+            onSelect={selectMarket}
+          />
+        )}
+      </div>
     </div>
   )
 }

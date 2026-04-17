@@ -33,7 +33,7 @@ export function MobileNavMenu() {
       </button>
 
       {open && (
-        <div className="absolute top-16 left-0 right-0 z-50 bg-green-700 dark:bg-green-900 shadow-lg border-t border-green-600 dark:border-green-800">
+        <div className="absolute top-16 left-0 right-0 z-[2000] bg-green-700 dark:bg-green-900 shadow-lg border-t border-green-600 dark:border-green-800">
           {NAV_LINKS.map(({ href, label }) => (
             <Link
               key={href}
