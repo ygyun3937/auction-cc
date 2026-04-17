@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { NationwideProductPrice } from '@/types'
+import { isSeasonalProduct } from '@/lib/seasonal'
 
 type SortKey = 'name' | 'price' | 'change'
 
@@ -54,7 +55,7 @@ export function ProductsTable({ data }: { data: NationwideProductPrice[] }) {
             <button
               key={code}
               onClick={() => setActiveCategory(code)}
-              className={`px-4 py-2.5 text-xs font-semibold whitespace-nowrap border-b-2 transition-colors ${
+              className={`px-3 sm:px-4 py-3 text-xs font-semibold whitespace-nowrap border-b-2 transition-colors ${
                 activeCategory === code
                   ? 'text-green-600 dark:text-green-400 border-green-500'
                   : 'text-gray-400 dark:text-gray-500 border-transparent hover:text-gray-600 dark:hover:text-gray-300'
@@ -70,7 +71,7 @@ export function ProductsTable({ data }: { data: NationwideProductPrice[] }) {
       <table className="w-full">
         <thead>
           <tr className="border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
-            <th className="px-4 py-2.5 text-left">
+            <th className="px-3 sm:px-4 py-2.5 text-left">
               <button
                 onClick={() => handleSort('name')}
                 className="text-xs text-gray-400 dark:text-gray-500 font-semibold hover:text-gray-700 dark:hover:text-gray-300"
@@ -78,7 +79,7 @@ export function ProductsTable({ data }: { data: NationwideProductPrice[] }) {
                 품목{sortIndicator('name')}
               </button>
             </th>
-            <th className="px-4 py-2.5 text-right">
+            <th className="px-3 sm:px-4 py-2.5 text-right">
               <button
                 onClick={() => handleSort('price')}
                 className="text-xs text-gray-400 dark:text-gray-500 font-semibold hover:text-gray-700 dark:hover:text-gray-300"
@@ -86,7 +87,7 @@ export function ProductsTable({ data }: { data: NationwideProductPrice[] }) {
                 현재가{sortIndicator('price')}
               </button>
             </th>
-            <th className="px-4 py-2.5 text-right">
+            <th className="px-3 sm:px-4 py-2.5 text-right">
               <button
                 onClick={() => handleSort('change')}
                 className={`text-xs font-semibold hover:text-red-400 ${
@@ -101,7 +102,7 @@ export function ProductsTable({ data }: { data: NationwideProductPrice[] }) {
         <tbody className="divide-y divide-gray-50 dark:divide-gray-700/50">
           {sorted.length === 0 ? (
             <tr>
-              <td colSpan={3} className="px-4 py-10 text-center text-sm text-gray-400 dark:text-gray-500">
+              <td colSpan={3} className="px-3 sm:px-4 py-10 text-center text-sm text-gray-400 dark:text-gray-500">
                 데이터가 없습니다
               </td>
             </tr>
@@ -116,16 +117,21 @@ export function ProductsTable({ data }: { data: NationwideProductPrice[] }) {
                 onClick={() => router.push(`/products/${p.productCode}`)}
                 className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
               >
-                <td className="px-4 py-3">
-                  <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                    {p.productName}
+                <td className="px-3 sm:px-4 py-2.5 sm:py-3">
+                  <div className="flex items-center gap-1">
+                    <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                      {p.productName}
+                    </span>
+                    {isSeasonalProduct(p.productName) && (
+                      <span className="text-xs" title={`${new Date().getMonth() + 1}월 제철`}>🌿</span>
+                    )}
                   </div>
                   <div className="text-xs text-gray-400 dark:text-gray-500">원/{p.unit}</div>
                 </td>
-                <td className={`px-4 py-3 text-right text-base font-bold tabular-nums ${colorClass}`}>
+                <td className={`px-3 sm:px-4 py-2.5 sm:py-3 text-right text-sm sm:text-base font-bold tabular-nums ${colorClass}`}>
                   {Math.round(p.todayAvg).toLocaleString()}
                 </td>
-                <td className="px-4 py-3 text-right">
+                <td className="px-3 sm:px-4 py-2.5 sm:py-3 text-right">
                   {p.change1d != null ? (
                     <>
                       <div className={`text-sm font-bold tabular-nums ${colorClass}`}>

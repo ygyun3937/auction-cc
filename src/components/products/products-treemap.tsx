@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { select } from 'd3-selection'
 import { hierarchy, treemap, treemapSquarify, HierarchyRectangularNode } from 'd3-hierarchy'
 import type { NationwideProductPrice } from '@/types'
+import { isSeasonalProduct } from '@/lib/seasonal'
 
 function getColor(change: number | null): string {
   if (change == null) return '#374151'
@@ -65,7 +66,7 @@ export function ProductsTreemap({ data }: { data: NationwideProductPrice[] }) {
       }
 
       const W = containerRef.current.clientWidth
-      const H = Math.round(W * 0.55)
+      const H = Math.round(W * (W < 640 ? 0.9 : 0.55))
 
       const svg = select(svgRef.current)
         .attr('width', W)
@@ -164,6 +165,16 @@ export function ProductsTreemap({ data }: { data: NationwideProductPrice[] }) {
               .attr('font-weight', '600')
               .attr('pointer-events', 'none')
               .text(item.change1d != null ? `${sign}${item.change1d.toFixed(1)}%` : '—')
+          }
+
+          if (isSeasonalProduct(item.productName)) {
+            g.append('text')
+              .attr('x', w - 4)
+              .attr('y', 12)
+              .attr('text-anchor', 'end')
+              .attr('font-size', Math.min(11, w / 5))
+              .attr('pointer-events', 'none')
+              .text('🌿')
           }
         } else if (w >= 28 && h >= 22) {
           g.append('text')
