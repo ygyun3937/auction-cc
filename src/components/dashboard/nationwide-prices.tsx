@@ -91,7 +91,7 @@ export function NationwidePrices({ items }: Props) {
               >
                 <span className="flex items-center gap-1 text-sm text-gray-700 dark:text-gray-300">
                   {item.productName}
-                  {isSeasonalProduct(item.productName) && <span className="text-xs">🌿</span>}
+                  {isSeasonalProduct(item.productName) && <span className="text-xs" title={`${new Date().getMonth() + 1}월 제철`}>🌿</span>}
                 </span>
                 <span className="text-xs font-semibold text-red-500">
                   ▲ {Math.abs(item.change7d ?? 0).toFixed(1)}%
@@ -111,7 +111,7 @@ export function NationwidePrices({ items }: Props) {
               >
                 <span className="flex items-center gap-1 text-sm text-gray-700 dark:text-gray-300">
                   {item.productName}
-                  {isSeasonalProduct(item.productName) && <span className="text-xs">🌿</span>}
+                  {isSeasonalProduct(item.productName) && <span className="text-xs" title={`${new Date().getMonth() + 1}월 제철`}>🌿</span>}
                 </span>
                 <span className="text-xs font-semibold text-blue-500">
                   ▼ {Math.abs(item.change7d ?? 0).toFixed(1)}%
