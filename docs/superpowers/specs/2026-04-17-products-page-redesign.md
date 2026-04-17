@@ -45,14 +45,14 @@ No new service function or DB query needed. Redis-cached, same data as dashboard
 **Props:** `data: NationwideProductPrice[]`
 
 **Behavior:**
-- Groups data by `categoryCode`
-- Renders one D3 treemap per category, stacked vertically
-- Each category has a label row (`채소류`, `과일류`, …)
-- `d3.treemap().tile(d3.treemapSquarify)` — boxes fill width, height proportional to total volume of category
-- Each leaf cell shows: 품목명, 현재가, 등락% (font size scales with box size; omit text if box too small)
-- Click → `router.push('/products/{code}')`
-- `useEffect` + `useRef` for D3 rendering; re-renders on window resize (debounced)
-- D3 imported as `import * as d3 from 'd3'` (already in package.json if present, else add)
+- Builds a 2-level D3 hierarchy: root → categories → products
+- Renders as a **single unified treemap** (one SVG) — categories are parent nodes, products are leaf nodes
+- `d3.treemap().paddingTop(18).paddingOuter(3).paddingInner(2).tile(d3.treemapSquarify)`
+- Category areas: dark background (`#1f2937`) + green label text at top-left
+- Leaf cells: colored by `change1d`, show 품목명 / 현재가 / 등락% (font scales with box size; omit text if too small)
+- Click on leaf → `router.push('/products/{code}')`
+- `useEffect` + `useRef` for D3 rendering; re-renders on window resize (debounced 150ms)
+- D3 imported as `import * as d3 from 'd3'`
 
 **Color scale for `change1d`:**
 
