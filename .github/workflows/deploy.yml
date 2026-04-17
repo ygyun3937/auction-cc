@@ -69,5 +69,6 @@ jobs:
               -v \$(pwd)/bundle:/app \
               -w /app \
               --env-file .env.prod \
+              -e PRISMA_SCHEMA_ENGINE_PATH=/app/node_modules/@prisma/engines/schema-engine-linux-openssl-3.0.x \
               node:20 \
               node node_modules/prisma/build/index.js migrate deploy"
