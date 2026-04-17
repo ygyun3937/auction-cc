@@ -1,7 +1,7 @@
 import { getAllProducts } from '@/services/product.service'
 import Link from 'next/link'
 
-export const revalidate = 3600 // 1시간 ISR
+export const dynamic = 'force-dynamic'
 
 export default async function ProductsPage() {
   let products: Awaited<ReturnType<typeof getAllProducts>> = []
