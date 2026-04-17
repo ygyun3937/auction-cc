@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
   })
 
   // Filter by current hour/minute (strict equality) and day of week
-  const targets = users.filter(u => {
+  const targets = users.filter((u: typeof users[number]) => {
     if (u.discordNotifyHour !== hour || u.discordNotifyMinute !== minute) return false
     if (u.discordNotifyDays === null) return true  // every day
     return u.discordNotifyDays.split(',').includes(dayOfWeek.toString())
