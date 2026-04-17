@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { collectAuctionData } from '@/collectors/auction.collector'
 import { z } from 'zod'
 
@@ -25,6 +26,13 @@ export async function POST(req: NextRequest) {
     const targetDate = parsed.success ? parsed.data.date : undefined
 
     const result = await collectAuctionData(targetDate)
+
+    if (result.success) {
+      revalidatePath('/products', 'layout')
+      revalidatePath('/markets', 'layout')
+      revalidatePath('/', 'layout')
+    }
+
     return NextResponse.json({ success: result.success, recordCount: result.recordCount, durationMs: result.durationMs })
   } catch (error) {
     console.error('[/api/cron/collect]', error)
