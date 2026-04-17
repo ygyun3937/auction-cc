@@ -24,7 +24,7 @@ export function RegionList({ markets }: Props) {
             <div className="px-4 py-2.5 border-b border-gray-100 dark:border-gray-700 bg-green-50 dark:bg-green-900/20">
               <h3 className="font-semibold text-green-800 dark:text-green-300 text-sm">{region}</h3>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 divide-x divide-y divide-gray-50 dark:divide-gray-700">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-0 divide-x divide-y divide-gray-50 dark:divide-gray-700">
               {mList.map(m => (
                 <Link
                   key={m.code}
