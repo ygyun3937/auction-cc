@@ -3,7 +3,7 @@
 import 'leaflet/dist/leaflet.css'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import type { Market, NationwideProductPrice, MarketProductPrice, ApiResponse } from '@/types'
-import { isSeasonalProduct, getSeasonalNames } from '@/lib/seasonal'
+import { isSeasonalProduct } from '@/lib/seasonal'
 import { getMarketCoords } from '@/lib/market-coords'
 import { MarketsFilterTable } from './markets-filter-table'
 
@@ -29,6 +29,10 @@ interface Props {
   nationwide: NationwideProductPrice[]
 }
 
+function escHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
 function pinHtml(state: PinState): string {
   const styles: Record<PinState, string> = {
     normal:    'width:12px;height:12px;border-radius:50%;background:#16a34a;border:2px solid #4ade80;box-shadow:0 0 7px rgba(74,222,128,.5)',
@@ -43,6 +47,7 @@ export function MarketsMap({ markets, nationwide }: Props) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<unknown>(null) // L.Map
   const markersRef = useRef<Map<string, MarkerEntry>>(new Map())
+  const selectMarketRef = useRef<(code: string) => void>(() => {})
 
   const [activeProduct, setActiveProduct] = useState<ActiveProduct | null>(null)
   const [selectedMarketCode, setSelectedMarketCode] = useState<string | null>(null)
@@ -50,8 +55,6 @@ export function MarketsMap({ markets, nationwide }: Props) {
   const [loadingFilter, setLoadingFilter] = useState(false)
 
   const month = new Date().getMonth() + 1
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const seasonalNames = getSeasonalNames(month)
 
   // Seasonal products: NationwideProductPrice items whose name matches this month's seasonal list
   const seasonalProducts = nationwide.filter(p => isSeasonalProduct(p.productName, month))
@@ -86,7 +89,7 @@ export function MarketsMap({ markets, nationwide }: Props) {
     setLoadingFilter(true)
 
     try {
-      const res = await fetch(`/api/v1/markets/product-prices?productCode=${prod.productCode}`)
+      const res = await fetch(`/api/v1/markets/product-prices?productCode=${encodeURIComponent(prod.productCode)}`)
       const json: ApiResponse<MarketProductPrice[]> = await res.json()
       const marketPrices = json.data ?? []
       setFilterMarkets(marketPrices)
@@ -97,6 +100,7 @@ export function MarketsMap({ markets, nationwide }: Props) {
       })
     } catch {
       setFilterMarkets([])
+      markersRef.current.forEach((_, code) => setMarkerState(code, 'normal'))
     } finally {
       setLoadingFilter(false)
     }
@@ -132,15 +136,19 @@ export function MarketsMap({ markets, nationwide }: Props) {
   }, [selectedMarketCode, filterMarkets, setMarkerState])
 
   useEffect(() => {
+    selectMarketRef.current = selectMarket
+  }, [selectMarket])
+
+  useEffect(() => {
     if (!mapRef.current) return
 
     // Dynamic import to avoid SSR issues
     import('leaflet').then(({ default: L }) => {
+      if (mapInstanceRef.current) return // already initialized
+
       // Expose L globally for icon updates after init
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ;(window as any).L = L
-
-      if (mapInstanceRef.current) return // already initialized
 
       const koreaBounds = L.latLngBounds([33.0, 124.5], [38.6, 130.5])
       const map = L.map(mapRef.current!, {
@@ -173,13 +181,14 @@ export function MarketsMap({ markets, nationwide }: Props) {
 
         const marker = L.marker([coords.lat, coords.lng], { icon }).addTo(map)
         marker.bindPopup(`
-          <div style="font-size:13px;font-weight:700;color:#f1f5f9">${m.name}</div>
-          <div style="font-size:11px;color:#4ade80;margin-top:1px">${m.region}</div>
-          ${m.address ? `<div style="font-size:10px;color:#64748b;margin-top:4px">${m.address}</div>` : ''}
+          <div style="font-size:13px;font-weight:700;color:#f1f5f9">${escHtml(m.name)}</div>
+          <div style="font-size:11px;color:#4ade80;margin-top:1px">${escHtml(m.region)}</div>
+          ${m.address ? `<div style="font-size:10px;color:#64748b;margin-top:4px">${escHtml(m.address)}</div>` : ''}
         `)
 
         const entry: MarkerEntry = { marker, code: m.code, region: m.region, name: m.name, lat: coords.lat, lng: coords.lng }
         markersRef.current.set(m.code, entry)
+        marker.on('click', () => selectMarketRef.current(entry.code))
       })
     })
 
@@ -194,14 +203,6 @@ export function MarketsMap({ markets, nationwide }: Props) {
       }
     }
   }, [markets])
-
-  // Attach selectMarket to marker clicks (re-run when selectMarket changes)
-  useEffect(() => {
-    markersRef.current.forEach((entry) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ;(entry.marker as any).off('click').on('click', () => selectMarket(entry.code))
-    })
-  }, [selectMarket])
 
   function chipColor(change: number | null) {
     if (change == null || Math.abs(change) < 0.5) return 'text-gray-400'
