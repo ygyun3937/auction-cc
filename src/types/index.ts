@@ -22,6 +22,17 @@ export interface Market {
   address?: string | null
 }
 
+export interface MarketProductPrice {
+  marketCode: string
+  marketName: string
+  region: string
+  avgPrice: number
+  minPrice: number
+  maxPrice: number
+  volume: number
+  priceDate: string
+}
+
 // Product types
 export interface ProductCategory {
   id: number
@@ -113,6 +124,15 @@ export interface GradePrice {
 export interface VarietyPrice {
   varietyCode: string
   varietyName: string
+  avgPrice: number
+  minPrice: number
+  maxPrice: number
+  totalVolume: number
+  priceDate: string
+}
+
+export interface OriginPrice {
+  originName: string
   avgPrice: number
   minPrice: number
   maxPrice: number
