@@ -2,7 +2,8 @@
 
 import { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import * as d3 from 'd3'
+import { select } from 'd3-selection'
+import { hierarchy, treemap, treemapSquarify, HierarchyRectangularNode } from 'd3-hierarchy'
 import type { NationwideProductPrice } from '@/types'
 
 function getColor(change: number | null): string {
@@ -66,24 +67,24 @@ export function ProductsTreemap({ data }: { data: NationwideProductPrice[] }) {
       const W = containerRef.current.clientWidth
       const H = Math.round(W * 0.55)
 
-      const svg = d3.select(svgRef.current)
+      const svg = select(svgRef.current)
         .attr('width', W)
         .attr('height', H)
       svg.selectAll('*').remove()
 
       type TreeNode = TreeRoot | TreeCategory | TreeLeaf
 
-      const hierarchy = d3.hierarchy<TreeNode>(hierarchyData)
+      const hier = hierarchy<TreeNode>(hierarchyData)
         .sum(d => ('totalVolume' in d ? d.totalVolume : 0))
         .sort((a, b) => (b.value ?? 0) - (a.value ?? 0))
 
-      const root: d3.HierarchyRectangularNode<TreeNode> = d3.treemap<TreeNode>()
+      const root: HierarchyRectangularNode<TreeNode> = treemap<TreeNode>()
         .size([W, H])
         .paddingOuter(3)
         .paddingTop(18)
         .paddingInner(2)
         .round(true)
-        .tile(d3.treemapSquarify)(hierarchy)
+        .tile(treemapSquarify)(hier)
 
       // Category parent backgrounds + labels
       const parents = root.children ?? []
@@ -105,7 +106,7 @@ export function ProductsTreemap({ data }: { data: NationwideProductPrice[] }) {
       })
 
       // Leaf cells
-      const cell = svg.selectAll<SVGGElement, d3.HierarchyRectangularNode<TreeRoot | TreeCategory | TreeLeaf>>('g.leaf')
+      const cell = svg.selectAll<SVGGElement, HierarchyRectangularNode<TreeRoot | TreeCategory | TreeLeaf>>('g.leaf')
         .data(root.leaves())
         .join('g')
         .attr('class', 'leaf')
@@ -115,7 +116,7 @@ export function ProductsTreemap({ data }: { data: NationwideProductPrice[] }) {
       // Attach click via DOM to avoid stale closure issue
       cell.each(function(d) {
         const code = (d.data as TreeLeaf).productCode
-        d3.select(this).on('click', () => {
+        select(this).on('click', () => {
           router.push(`/products/${code}`)
         })
       })
@@ -125,14 +126,14 @@ export function ProductsTreemap({ data }: { data: NationwideProductPrice[] }) {
         .attr('height', d => Math.max(0, d.y1 - d.y0))
         .attr('fill', d => getColor((d.data as TreeLeaf).change1d))
         .attr('rx', 3)
-        .on('mouseover', function() { d3.select(this).attr('opacity', '0.8') })
-        .on('mouseout', function() { d3.select(this).attr('opacity', '1') })
+        .on('mouseover', function() { select(this).attr('opacity', '0.8') })
+        .on('mouseout', function() { select(this).attr('opacity', '1') })
 
       cell.each(function(d) {
         const item = d.data as TreeLeaf
         const w = d.x1 - d.x0
         const h = d.y1 - d.y0
-        const g = d3.select(this)
+        const g = select(this)
         const tc = getTextColor(item.change1d)
 
         if (w >= 44 && h >= 38) {
@@ -179,14 +180,14 @@ export function ProductsTreemap({ data }: { data: NationwideProductPrice[] }) {
     render()
 
     let resizeTimeout: ReturnType<typeof setTimeout>
-    const handleResize = () => {
+    const observer = new ResizeObserver(() => {
       clearTimeout(resizeTimeout)
       resizeTimeout = setTimeout(render, 150)
-    }
-    window.addEventListener('resize', handleResize)
+    })
+    observer.observe(containerRef.current)
     return () => {
+      observer.disconnect()
       clearTimeout(resizeTimeout)
-      window.removeEventListener('resize', handleResize)
     }
   }, [data, router])
 
