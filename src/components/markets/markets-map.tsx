@@ -54,6 +54,7 @@ export function MarketsMap({ markets, nationwide }: Props) {
   const [selectedMarketCode, setSelectedMarketCode] = useState<string | null>(null)
   const [filterMarkets, setFilterMarkets] = useState<MarketProductPrice[]>([])
   const [loadingFilter, setLoadingFilter] = useState(false)
+  const [filterQuery, setFilterQuery] = useState('')
 
   const month = new Date().getMonth() + 1
 
@@ -62,6 +63,10 @@ export function MarketsMap({ markets, nationwide }: Props) {
   // All products sorted by volume desc, exclude duplicates already in seasonal
   const seasonalCodes = new Set(seasonalProducts.map(p => p.productCode))
   const otherProducts = nationwide.filter(p => !seasonalCodes.has(p.productCode))
+
+  const q = filterQuery.trim()
+  const visibleSeasonal = q ? seasonalProducts.filter(p => p.productName.includes(q)) : seasonalProducts
+  const visibleOther = q ? otherProducts.filter(p => p.productName.includes(q)) : otherProducts
 
   const setMarkerState = useCallback((code: string, state: PinState) => {
     const entry = markersRef.current.get(code)
@@ -220,18 +225,30 @@ export function MarketsMap({ markets, nationwide }: Props) {
       {/* LEFT: Filter panel */}
       <div
         className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm overflow-hidden flex flex-col lg:sticky lg:top-4"
-        style={{ maxHeight: '600px' }}
+        style={{ height: '560px' }}
       >
-        <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
-          <span className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide">품목 필터</span>
+        <div className="px-4 pt-3 pb-3 border-b border-gray-100 dark:border-gray-700 space-y-2">
+          <span className="text-sm font-bold text-gray-700 dark:text-gray-200">품목 필터</span>
+          <div className="relative">
+            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              type="text"
+              value={filterQuery}
+              onChange={e => setFilterQuery(e.target.value)}
+              placeholder="품목 검색..."
+              className="w-full pl-7 pr-3 py-1.5 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:border-green-400 dark:focus:border-green-500 transition-colors"
+            />
+          </div>
         </div>
         <div className="overflow-y-auto flex-1">
-          {seasonalProducts.length > 0 && (
+          {visibleSeasonal.length > 0 && (
             <>
               <div className="px-4 pt-3 pb-1">
                 <span className="text-xs font-bold text-green-600 dark:text-green-400">🌿 {month}월 제철</span>
               </div>
-              {seasonalProducts.map(p => {
+              {visibleSeasonal.map(p => {
                 const isActive = activeProduct?.productCode === p.productCode
                 return (
                   <button
@@ -262,7 +279,7 @@ export function MarketsMap({ markets, nationwide }: Props) {
           <div className="px-4 pt-3 pb-1">
             <span className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide">전체 품목</span>
           </div>
-          {otherProducts.slice(0, 20).map(p => {
+          {visibleOther.slice(0, 20).map(p => {
             const isActive = activeProduct?.productCode === p.productCode
             return (
               <button
@@ -316,7 +333,7 @@ export function MarketsMap({ markets, nationwide }: Props) {
         )}
 
         <div className="rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm">
-          <div ref={mapRef} style={{ width: '100%', height: '440px' }} />
+          <div ref={mapRef} style={{ width: '100%', height: '560px' }} />
         </div>
 
         {activeProduct && !loadingFilter && filterMarkets.length > 0 && (
