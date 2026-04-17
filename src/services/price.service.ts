@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/db'
 import { getCache, setCache, CACHE_KEYS, CACHE_TTL } from '@/lib/redis'
-import type { AuctionPrice, DailyPrice, PriceTrend, PriceSummary, PriceQueryParams, PriceTrendParams, DashboardSummary, NationwideProductPrice, VarietyPrice, GradePrice } from '@/types'
+import type { AuctionPrice, DailyPrice, PriceTrend, PriceSummary, PriceQueryParams, PriceTrendParams, DashboardSummary, NationwideProductPrice, VarietyPrice, GradePrice, OriginPrice } from '@/types'
 
 export async function getPrices(params: PriceQueryParams): Promise<{ data: AuctionPrice[]; total: number }> {
   const { marketCode, productCode, startDate, endDate, grade, page = 1, limit = 50 } = params
@@ -115,6 +115,14 @@ export async function getNationwidePrices(): Promise<NationwideProductPrice[]> {
         ? ((Number(entry.latest.avgPrice) - avg7d) / avg7d) * 100
         : null
 
+    // history is sorted desc by priceDate; [0] is the most recent previous day
+    const prevDay = entry.history[0] ?? null
+    const change1d = entry.latest.changeRate
+      ? Number(entry.latest.changeRate)
+      : prevDay && Number(prevDay.avgPrice) > 0
+        ? ((Number(entry.latest.avgPrice) - Number(prevDay.avgPrice)) / Number(prevDay.avgPrice)) * 100
+        : null
+
     result.push({
       productCode: entry.product.code,
       productName: entry.product.name,
@@ -126,7 +134,7 @@ export async function getNationwidePrices(): Promise<NationwideProductPrice[]> {
       todayMin: Number(entry.latest.minPrice),
       todayMax: Number(entry.latest.maxPrice),
       totalVolume: Number(entry.latest.totalVolume),
-      change1d: entry.latest.changeRate ? Number(entry.latest.changeRate) : null,
+      change1d,
       change7d,
       priceDate: entry.latest.priceDate.toISOString().split('T')[0],
       excludedMarkets: entry.latest.excludedMarkets ?? 0,
@@ -223,6 +231,37 @@ export async function getVarietyPrices(productCode: string): Promise<VarietyPric
   const result: VarietyPrice[] = rows.map(r => ({
     varietyCode: r.varietyCode,
     varietyName: r.varietyName,
+    avgPrice: Number(r.avgPrice),
+    minPrice: Number(r.minPrice),
+    maxPrice: Number(r.maxPrice),
+    totalVolume: Number(r.totalVolume),
+    priceDate: r.priceDate.toISOString().split('T')[0],
+  }))
+
+  await setCache(cacheKey, result, CACHE_TTL.PRICE_LIST)
+  return result
+}
+
+export async function getOriginPrices(productCode: string): Promise<OriginPrice[]> {
+  const cacheKey = `origin:${productCode}`
+  const cached = await getCache<OriginPrice[]>(cacheKey)
+  if (cached) return cached
+
+  const latestRecord = await prisma.originDailyPrice.findFirst({
+    where: { product: { code: productCode } },
+    orderBy: { priceDate: 'desc' },
+    select: { priceDate: true },
+  })
+  if (!latestRecord) return []
+
+  const rows = await prisma.originDailyPrice.findMany({
+    where: { product: { code: productCode }, priceDate: latestRecord.priceDate },
+    orderBy: { totalVolume: 'desc' },
+    take: 20,
+  })
+
+  const result: OriginPrice[] = rows.map(r => ({
+    originName: r.originName,
     avgPrice: Number(r.avgPrice),
     minPrice: Number(r.minPrice),
     maxPrice: Number(r.maxPrice),
