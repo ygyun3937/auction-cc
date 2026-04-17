@@ -35,7 +35,7 @@ jobs:
           cp -r prisma .next/standalone/prisma
           # Include prisma CLI + engine binaries (compiled on ubuntu, avoids re-download in container)
           cp -r node_modules/prisma .next/standalone/node_modules/prisma
-          cp -r node_modules/@prisma .next/standalone/node_modules/@prisma
+          cp -r node_modules/@prisma/engines .next/standalone/node_modules/@prisma/engines
 
       - name: Setup SSH
         uses: webfactory/ssh-agent@v0.9.0
