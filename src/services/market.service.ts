@@ -53,34 +53,42 @@ export async function getMarketPricesForProduct(productCode: string): Promise<Ma
   // Group by market, aggregate
   const marketMap = new Map<string, {
     market: { code: string; name: string; region: string; address: string | null }
-    prices: number[]
-    minPrices: number[]
-    maxPrices: number[]
-    volumes: number[]
+    weightedPriceSum: number
+    minPrice: number
+    maxPrice: number
+    totalVolume: number
   }>()
 
   for (const row of rows) {
     const key = row.market.code
+    const vol = Number(row.volume)
     if (!marketMap.has(key)) {
-      marketMap.set(key, { market: row.market, prices: [], minPrices: [], maxPrices: [], volumes: [] })
+      marketMap.set(key, {
+        market: row.market,
+        weightedPriceSum: 0,
+        minPrice: Infinity,
+        maxPrice: -Infinity,
+        totalVolume: 0,
+      })
     }
     const entry = marketMap.get(key)!
-    entry.prices.push(Number(row.avgPrice))
-    entry.minPrices.push(Number(row.minPrice))
-    entry.maxPrices.push(Number(row.maxPrice))
-    entry.volumes.push(Number(row.volume))
+    entry.weightedPriceSum += Number(row.avgPrice) * vol
+    if (Number(row.minPrice) < entry.minPrice) entry.minPrice = Number(row.minPrice)
+    if (Number(row.maxPrice) > entry.maxPrice) entry.maxPrice = Number(row.maxPrice)
+    entry.totalVolume += vol
   }
 
   const result: MarketProductPrice[] = []
-  for (const { market, prices, minPrices, maxPrices, volumes } of marketMap.values()) {
+  for (const { market, weightedPriceSum, minPrice, maxPrice, totalVolume } of marketMap.values()) {
+    if (totalVolume === 0) continue
     result.push({
       marketCode: market.code,
       marketName: market.name,
       region: market.region,
-      avgPrice: Math.round(prices.reduce((s, v) => s + v, 0) / prices.length),
-      minPrice: Math.min(...minPrices),
-      maxPrice: Math.max(...maxPrices),
-      volume: volumes.reduce((s, v) => s + v, 0),
+      avgPrice: Math.round(weightedPriceSum / totalVolume),
+      minPrice,
+      maxPrice,
+      volume: totalVolume,
       priceDate: latestRecord.auctionDate.toISOString().split('T')[0],
     })
   }

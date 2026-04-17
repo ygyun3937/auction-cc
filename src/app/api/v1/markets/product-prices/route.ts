@@ -3,7 +3,7 @@ import { getMarketPricesForProduct } from '@/services/market.service'
 import type { ApiResponse } from '@/types'
 
 export async function GET(req: NextRequest) {
-  const productCode = req.nextUrl.searchParams.get('productCode')
+  const productCode = req.nextUrl.searchParams.get('productCode')?.trim()
   if (!productCode) {
     return NextResponse.json({ error: { code: 'BAD_REQUEST', message: 'productCode required' } }, { status: 400 })
   }
