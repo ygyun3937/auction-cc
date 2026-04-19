@@ -9,6 +9,10 @@ interface Props {
 }
 
 export function DashboardClient({ summary, nationwide }: Props) {
+  const today = new Date().toISOString().split('T')[0]
+  const priceDate = nationwide[0]?.priceDate
+  const isHoliday = !!priceDate && priceDate !== today
+
   if (!summary && nationwide.length === 0) {
     return (
       <div className="text-center py-24 text-gray-500 dark:text-gray-400">
@@ -27,7 +31,14 @@ export function DashboardClient({ summary, nationwide }: Props) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard label="전국 도매시장" value={summary?.totalMarkets ?? 0} unit="개" />
         <StatCard label="모니터링 품목" value={nationwide.length || (summary?.totalProducts ?? 0)} unit="개" />
-        <StatCard label="오늘 수집 건수" value={summary?.recentAuctions.length ?? 0} unit="건" />
+        {isHoliday ? (
+          <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-700 shadow-sm px-4 py-3 flex flex-col justify-center">
+            <p className="text-xs text-amber-600 dark:text-amber-400">오늘 경매</p>
+            <p className="text-sm font-semibold text-amber-700 dark:text-amber-300 mt-0.5">휴장일</p>
+          </div>
+        ) : (
+          <StatCard label="오늘 수집 건수" value={summary?.recentAuctions.length ?? 0} unit="건" />
+        )}
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm px-4 py-3 flex flex-col justify-center">
           <p className="text-xs text-gray-500 dark:text-gray-400">최종 업데이트</p>
           <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 mt-0.5 truncate">

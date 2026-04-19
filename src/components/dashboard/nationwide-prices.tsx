@@ -48,6 +48,10 @@ export function NationwidePrices({ items }: Props) {
   const { data: session } = useSession()
   const categoryNames = Array.from(new Set(items.map(i => i.categoryName)))
   const [activeTab, setActiveTab] = useState('TOP10')
+
+  const today = new Date().toISOString().split('T')[0]
+  const priceDate = items[0]?.priceDate
+  const isHoliday = !!priceDate && priceDate !== today
   const [favoriteCodes, setFavoriteCodes] = useState<string[]>([])
 
   useEffect(() => {
@@ -78,6 +82,14 @@ export function NationwidePrices({ items }: Props) {
 
   return (
     <div className="space-y-4">
+      {/* Holiday notice */}
+      {isHoliday && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg text-xs text-amber-700 dark:text-amber-400">
+          <span>📅</span>
+          <span>오늘({today}) 경매 휴장일 · <span className="font-semibold">{priceDate}</span> 마지막 거래 기준 데이터입니다</span>
+        </div>
+      )}
+
       {/* Top movers row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm p-4">
