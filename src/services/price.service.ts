@@ -2,6 +2,19 @@ import { prisma } from '@/lib/db'
 import { getCache, setCache, CACHE_KEYS, CACHE_TTL } from '@/lib/redis'
 import type { AuctionPrice, DailyPrice, PriceTrend, PriceSummary, PriceQueryParams, PriceTrendParams, DashboardSummary, NationwideProductPrice, VarietyPrice, GradePrice, OriginPrice } from '@/types'
 
+const MIN_PRODUCTS_FOR_VALID_DAY = 50
+
+async function getLatestValidPriceDate(): Promise<Date | null> {
+  const recentDates = await prisma.dailyPrice.groupBy({
+    by: ['priceDate'],
+    _count: { id: true },
+    orderBy: { priceDate: 'desc' },
+    take: 10,
+  })
+  if (recentDates.length === 0) return null
+  return (recentDates.find(r => r._count.id >= MIN_PRODUCTS_FOR_VALID_DAY) ?? recentDates[0]).priceDate
+}
+
 export async function getPrices(params: PriceQueryParams): Promise<{ data: AuctionPrice[]; total: number }> {
   const { marketCode, productCode, startDate, endDate, grade, page = 1, limit = 50 } = params
 
@@ -67,13 +80,8 @@ export async function getNationwidePrices(): Promise<NationwideProductPrice[]> {
   const cached = await getCache<NationwideProductPrice[]>(cacheKey)
   if (cached) return cached
 
-  const latestRecord = await prisma.dailyPrice.findFirst({
-    orderBy: { priceDate: 'desc' },
-    select: { priceDate: true },
-  })
-  if (!latestRecord) return []
-
-  const latestDate = latestRecord.priceDate
+  const latestDate = await getLatestValidPriceDate()
+  if (!latestDate) return []
   const sevenDaysAgo = new Date(latestDate)
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
 
@@ -282,12 +290,14 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     prisma.market.count(),
     prisma.product.count(),
     prisma.collectionLog.findFirst({ orderBy: { collectedAt: 'desc' }, where: { status: 'success' } }),
-    prisma.dailyPrice.findMany({
-      where: { changeRate: { not: null }, priceDate: { gte: new Date(Date.now() - 86400000) } },
-      include: { product: true },
-      orderBy: { changeRate: 'desc' },
-      take: 10,
-    }),
+    getLatestValidPriceDate().then(d =>
+      d ? prisma.dailyPrice.findMany({
+        where: { changeRate: { not: null }, priceDate: d },
+        include: { product: true },
+        orderBy: { changeRate: 'desc' },
+        take: 10,
+      }) : Promise.resolve([])
+    ),
     prisma.auctionPrice.findMany({
       include: { market: true, product: { include: { category: true } } },
       orderBy: { auctionDate: 'desc' },
