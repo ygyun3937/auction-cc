@@ -2,6 +2,7 @@ import { getAllMarkets } from '@/services/market.service'
 import { getNationwidePrices } from '@/services/price.service'
 import { MarketsMap } from '@/components/markets/markets-map'
 import { RegionList } from '@/components/markets/region-list'
+import { HolidayBanner } from '@/components/ui/holiday-banner'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,6 +29,7 @@ export default async function MarketsPage() {
         </div>
       ) : (
         <>
+          <HolidayBanner priceDate={nationwide[0]?.priceDate} />
           <MarketsMap markets={markets} nationwide={nationwide} />
           <RegionList markets={markets} />
         </>

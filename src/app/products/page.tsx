@@ -1,6 +1,7 @@
 import { getNationwidePrices } from '@/services/price.service'
 import { ProductsTreemap } from '@/components/products/products-treemap'
 import { ProductsTable } from '@/components/products/products-table'
+import { HolidayBanner } from '@/components/ui/holiday-banner'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,6 +28,7 @@ export default async function ProductsPage() {
         </div>
       ) : (
         <>
+          <HolidayBanner priceDate={nationwide[0]?.priceDate} />
           <ProductsTreemap data={nationwide} />
           <div className="mt-6">
             <ProductsTable data={nationwide} />
